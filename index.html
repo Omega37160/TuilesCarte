@@ -83,38 +83,41 @@
             const entries = Object.keys(zip.files);
             logger(`Le ZIP contient ${entries.length} entrées.`);
 
-            for (const [path, entry] of Object.entries(zip.files)) {
-                if (entry.dir || path.includes('__MACOSX')) continue;
+for (const [path, entry] of Object.entries(zip.files)) {
+            // Log de TOUT ce qui passe pour comprendre ce que voit le téléphone
+            logger("Analyse : " + path);
 
-                if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                    // Analyse du chemin : Tiles/N+1/0/0/0.png
-                    // On veut garder : n+1/0/0/0.png
-                    let parts = path.split('/');
-                    
-                    // On cherche l'index du niveau (rdc, n+1, etc.)
-                    // On ignore les dossiers parents comme "Tiles"
-                    let cleanPathParts = [];
-                    let foundLevel = false;
-                    const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+            if (entry.dir || path.includes('__MACOSX')) continue;
 
-                    for(let part of parts) {
-                        if(levels.includes(part.toLowerCase()) || foundLevel) {
-                            cleanPathParts.push(part.toLowerCase());
-                            foundLevel = true;
-                        }
-                    }
+            if (path.match(/\.(png|jpg|jpeg)$/i)) {
+                const blob = await entry.async('blob');
+                
+                // On transforme le chemin en minuscules : "tiles/n+1/0/0/0.png"
+                let p = path.toLowerCase();
+                
+                // On cherche où commence le niveau (rdc, n-1, n+1, n+2)
+                let finalPath = "";
+                const segments = p.split('/');
+                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
 
-                    const finalPath = cleanPathParts.join('/');
-                    if (finalPath) {
-                        const blob = await entry.async('blob');
-                        const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
-                        await cache.put(virtualUrl, new Response(blob));
-                        count++;
-                        
-                        if(count === 1) logger("Exemple chemin mappé : " + finalPath);
-                    }
+                // On reconstruit le chemin à partir du nom du niveau
+                let startIndex = segments.findIndex(seg => levels.includes(seg));
+                
+                if (startIndex !== -1) {
+                    finalPath = segments.slice(startIndex).join('/');
+                } else {
+                    // Si on ne trouve pas de dossier de niveau, on prend juste le nom du fichier
+                    // Utile si le ZIP est "sale"
+                    finalPath = segments.join('/');
+                }
+
+                if (finalPath) {
+                    const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
+                    await cache.put(virtualUrl, new Response(blob));
+                    count++;
                 }
             }
+        }
 
             status.innerText = `Succès : ${count} tuiles chargées`;
             logger(`Import terminé. ${count} images mises en cache.`);
