@@ -1,21 +1,12 @@
-const CACHE_NAME = 'offline-maps-v1';
+const cacheName = 'offline-maps-v1';
 
-// Installation : on met en cache le squelette de l'app
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(['index.html', 'manifest.json']);
-    })
-  );
-});
-
-// Interception des requêtes
 self.addEventListener('fetch', (event) => {
-    const url = event.request.url;
-    if (url.includes('/local-tiles/')) {
+    // On intercepte uniquement les requêtes vers nos tuiles locales
+    if (event.request.url.includes('/local-tiles/')) {
         event.respondWith(
-            caches.open('offline-maps-v1').then((cache) => {
+            caches.open(cacheName).then((cache) => {
                 return cache.match(event.request).then((response) => {
+                    // Si on trouve dans le cache, on renvoie, sinon on tente le réseau
                     return response || fetch(event.request);
                 });
             })
