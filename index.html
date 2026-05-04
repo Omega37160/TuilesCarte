@@ -60,6 +60,7 @@
     }
 
     // --- 2. GESTION DU ZIP ET DU CACHE ---
+// --- 2. GESTION DU ZIP ET DU CACHE ---
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -73,25 +74,34 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
         let count = 0;
 
         for (const [path, entry] of Object.entries(zip.files)) {
+            // On vérifie si c'est un fichier image
             if (!entry.dir && path.match(/\.(png|jpg|jpeg)$/i)) {
                 const blob = await entry.async('blob');
                 
-                // --- CORRECTION DU CHEMIN ---
+                // Nettoyage du chemin : 
+                // On transforme en minuscule pour la cohérence
                 let cleanPath = path.toLowerCase();
                 
-                // Si le chemin commence par "tiles/", on l'enlève pour avoir directement "n+1/..."
-                if (cleanPath.startsWith('tiles/')) {
-                    cleanPath = cleanPath.replace('tiles/', '');
-                }
+                // On enlève le dossier racine "tiles/" s'il existe
+                // Utilisation d'une regex pour ignorer la casse au cas où
+                cleanPath = cleanPath.replace(/^tiles\//, '');
                 
+                // IMPORTANT : On construit l'URL virtuelle
                 const virtualUrl = window.location.origin + '/local-tiles/' + cleanPath;
+                
                 await cache.put(virtualUrl, new Response(blob));
                 count++;
             }
         }
-        status.innerText = "Succès : " + count + " tuiles chargées.";
-        updateMap();
+        
+        if (count === 0) {
+            status.innerText = "Erreur : Aucune image trouvée dans le ZIP. Vérifiez la structure.";
+        } else {
+            status.innerText = "Succès : " + count + " tuiles chargées.";
+            updateMap();
+        }
     } catch (err) {
+        console.error(err);
         status.innerText = "Erreur : " + err.message;
     }
 });
