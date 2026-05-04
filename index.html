@@ -32,6 +32,27 @@
 </div>
 
 <div id="map"></div>
+<!-- Boutons d'action -->
+<div id="controls" style="flex-direction: row; justify-content: space-between;">
+    <button onclick="sendCsvByEmail()" style="background: #10b981; color: white; padding: 10px; border: none; border-radius: 5px; flex: 1; margin-right: 5px;">📧 Envoyer CSV</button>
+    <button onclick="clearCsv()" style="background: #ef4444; color: white; padding: 10px; border: none; border-radius: 5px; flex: 1;">🗑️ Vider Liste</button>
+</div>
+
+<!-- Modal de saisie -->
+<div id="equipmentModal" style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 20px; z-index: 2000; border: 1px solid #334155; width: 80%; border-radius: 10px;">
+    <h3>Nouvel Équipement</h3>
+    <input type="text" id="tagName" placeholder="Nom du Tag (ex: PT-101)">
+    <select id="tagType" style="margin-top: 10px;">
+        <option value="Instrumentation">Instrumentation</option>
+        <option value="Moteur">Moteur</option>
+        <option value="Armoire">Armoire</option>
+    </select>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="margin-top: 10px;">
+    <div style="margin-top: 15px; display: flex; gap: 10px;">
+        <button onclick="saveEquipment()" style="background: var(--primary); color: white; border: none; padding: 10px; flex: 1;">Enregistrer</button>
+        <button onclick="closeModal()" style="background: #64748b; color: white; border: none; padding: 10px; flex: 1;">Annuler</button>
+    </div>
+</div>
 <div id="debug-log">--- Logs Système ---<br></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -146,6 +167,93 @@ const logElement = document.getElementById('debug-log');
         L.circleMarker(e.latlng, { color: 'red', radius: 5 }).addTo(map);
         logger(`Clic : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
     });
+
+    let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
+let tempCoords = null;
+
+// Remplacer l'événement de clic existant
+map.on('click', (e) => {
+    tempCoords = e.latlng;
+    document.getElementById('equipmentModal').style.display = 'block';
+});
+
+function closeModal() {
+    document.getElementById('equipmentModal').style.display = 'none';
+    document.getElementById('tagName').value = '';
+}
+
+async function saveEquipment() {
+    const tag = document.getElementById('tagName').value;
+    const type = document.getElementById('tagType').value;
+    const photoFile = document.getElementById('photoInput').files[0];
+
+    if (!tag) { alert("Le nom du Tag est obligatoire"); return; }
+
+    // 1. Gestion de la photo
+    if (photoFile) {
+        const extension = photoFile.name.split('.').pop();
+        const newFileName = `${tag}.${extension}`;
+        
+        // Téléchargement automatique de l'image renommée sur le téléphone
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(photoFile);
+        link.download = newFileName;
+        link.click();
+        logger(`Photo enregistrée : ${newFileName}`);
+    }
+
+    // 2. Enregistrement des données
+    const newItem = {
+        tag,
+        type,
+        lat: tempCoords.lat.toFixed(6),
+        lng: tempCoords.lng.toFixed(6),
+        date: new Date().toLocaleString()
+    };
+
+    equipmentData.push(newItem);
+    localStorage.setItem('equipments', JSON.stringify(equipmentData));
+
+    // 3. Ajout visuel sur la carte
+    L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
+     .bindPopup(`<b>${tag}</b><br>${type}`).openPopup();
+
+    logger(`Équipement ${tag} ajouté au CSV local.`);
+    closeModal();
+}
+
+function sendCsvByEmail() {
+    if (equipmentData.length === 0) { alert("Le CSV est vide !"); return; }
+
+    let csvContent = "Tag;Type;Latitude;Longitude;Date\n";
+    equipmentData.forEach(item => {
+        csvContent += `${item.tag};${item.type};${item.lat};${item.lng};${item.date}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Création du lien de mail avec le corps du texte (le CSV est attaché manuellement par l'utilisateur ou copié)
+    // Note : On ne peut pas "attacher" automatiquement un fichier via un lien mailto: 
+    // On propose donc le téléchargement du CSV puis l'ouverture du mail.
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "releve_equipements.csv";
+    link.click();
+
+    setTimeout(() => {
+        window.location.href = `mailto:?subject=Relevé Terrain&body=Veuillez trouver ci-joint le relevé des ${equipmentData.length} équipements.`;
+    }, 1000);
+}
+
+function clearCsv() {
+    if (confirm("Voulez-vous vraiment vider tous les équipements enregistrés ?")) {
+        equipmentData = [];
+        localStorage.removeItem('equipments');
+        logger("Données CSV vidées.");
+        location.reload(); // Pour rafraîchir la carte
+    }
+}
 
 </script>
 </body>
