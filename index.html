@@ -38,13 +38,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
-    const logElement = document.getElementById('debug-log');
+const logElement = document.getElementById('debug-log');
     const status = document.getElementById('status');
     const cacheName = 'offline-maps-v1';
     
-    // --- CONFIGURATION INITIALE ---
-    // Centrage sur 50, 50 au zoom 1
-    let map = L.map('map').setView([50, 50], 1);
+    // On initialise la carte sur un point neutre
+    let map = L.map('map').setView([0, 0], 2);
     let currentLayer = null;
 
     function logger(msg) {
@@ -54,26 +53,32 @@
         logElement.scrollTop = logElement.scrollHeight;
     }
 
-    // --- ENREGISTREMENT DU SERVICE WORKER ---
+    // --- 1. ENREGISTREMENT ET VERIFICATION DU SW ---
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(() => {
-            logger("Service Worker : Prêt ✅");
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => logger("Service Worker : ✅ Enregistré"))
+            .catch(err => logger("Service Worker : ❌ Erreur : " + err));
+
+        navigator.serviceWorker.ready.then(() => {
+            logger("Service Worker : 🚀 Actif et prêt");
         });
+    } else {
+        logger("Service Worker : ❌ Non supporté sur ce navigateur");
     }
 
-    // --- LOGIQUE D'IMPORTATION ---
+    // --- 2. LOGIQUE D'IMPORTATION ---
     document.getElementById('zipInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
         logger("Fichier : " + file.name);
-        status.innerText = "Importation en cours...";
+        status.innerText = "Importation...";
         
         try {
             const zip = await JSZip.loadAsync(file);
             const cache = await caches.open(cacheName);
             let count = 0;
-            const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+            let firstPath = "";
 
             for (const [path, entry] of Object.entries(zip.files)) {
                 if (entry.dir || path.includes('__MACOSX')) continue;
@@ -88,49 +93,58 @@
                     
                     if (startIndex !== -1) {
                         let finalPath = segments.slice(startIndex).join('/');
-                        const virtualUrl = baseUrl + 'local-tiles/' + finalPath;
+                        // On construit l'URL exacte que Leaflet va demander
+                        const virtualUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'local-tiles/' + finalPath;
+                        
                         await cache.put(virtualUrl, new Response(blob));
+                        if(count === 0) firstPath = virtualUrl;
                         count++;
                     }
                 }
             }
 
-            status.innerText = `Succès : ${count} tuiles chargées`;
-            logger(`Terminé. ${count} images prêtes.`);
-            updateMap(); // Rafraîchir l'affichage après l'import
+            status.innerText = `Succès : ${count} tuiles`;
+            logger(`Import terminé. ${count} images en cache.`);
+            
+            // --- TEST DE CACHE IMMEDIAT ---
+            if(firstPath) {
+                const match = await caches.match(firstPath);
+                logger(match ? "✅ Test Cache : OK" : "❌ Test Cache : ÉCHEC (URL mal formée)");
+                logger("URL testée : " + firstPath);
+            }
+
+            updateMap();
         } catch (err) {
-            logger("ERREUR : " + err.message);
-            status.innerText = "Erreur ZIP";
+            logger("ERREUR ZIP : " + err.message);
         }
     });
 
-    // --- AFFICHAGE DE LA CARTE ---
     function updateMap() {
         const level = document.getElementById('levelSelect').value;
         if (currentLayer) map.removeLayer(currentLayer);
 
+        // Construction de l'URL pour Leaflet
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const tileUrl = baseUrl + 'local-tiles/' + level + '/{z}/{x}/{y}.png';
         
-        logger("Affichage niveau : " + level.toUpperCase());
+        logger("Affichage niveau : " + level);
 
         currentLayer = L.tileLayer(tileUrl, {
             maxZoom: 22,
             minZoom: 0,
-            noWrap: true
+            noWrap: true,
+            bounds: [[-90, -180], [90, 180]] // Empêche de chercher des tuiles à l'infini
         }).addTo(map);
+
+        // Si on a des tuiles au zoom 5, on force le zoom pour "voir" quelque chose
+        map.setView([0, 0], 5); 
     }
 
-    // Écouter les changements de niveau
     document.getElementById('levelSelect').addEventListener('change', updateMap);
 
-    // Charger le niveau par défaut au démarrage
-    updateMap();
-
-    // Debug clic
     map.on('click', (e) => {
         L.circleMarker(e.latlng, { color: 'red', radius: 5 }).addTo(map);
-        logger(`Coords : ${e.latlng.lat.toFixed(2)}, ${e.latlng.lng.toFixed(2)}`);
+        logger(`Clic : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
     });
 
 </script>
