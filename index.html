@@ -145,14 +145,14 @@ const logElement = document.getElementById('debug-log');
         logger("Affichage niveau : " + level);
 
         currentLayer = L.tileLayer(tileUrl, {
-            maxZoom: 5,
+            maxZoom: 6,
             minZoom: 0,
             noWrap: true,
             bounds: [[-90, -180], [90, 180]] // Empêche de chercher des tuiles à l'infini
         }).addTo(map);
 
         // Si on a des tuiles au zoom 5, on force le zoom pour "voir" quelque chose
-        map.setView([0, 0], 0); 
+        map.setView([0, 0], 5); 
     }
 
     document.getElementById('levelSelect').addEventListener('change', updateMap);
