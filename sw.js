@@ -11,10 +11,14 @@ self.addEventListener('install', (e) => {
 
 // Interception des requêtes
 self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request).then((response) => {
-            // Retourne la tuile du cache, sinon va sur internet
-            return response || fetch(event.request);
-        })
-    );
+    const url = event.request.url;
+    if (url.includes('/local-tiles/')) {
+        event.respondWith(
+            caches.open('offline-maps-v1').then((cache) => {
+                return cache.match(event.request).then((response) => {
+                    return response || fetch(event.request);
+                });
+            })
+        );
+    }
 });
