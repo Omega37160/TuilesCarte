@@ -3,137 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Carte Tuiles Offline</title>
-    <link rel="manifest" href="manifest.json">
+    <title>Carte Offline Debug</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root {
-            --primary: #3b82f6;
-            --bg: #0f172a;
-            --card: #1e293b;
-            --text: #f8fafc;
-        }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        header { padding: 10px; background: var(--card); text-align: center; border-bottom: 1px solid #334155; }
-        #controls { padding: 15px; display: flex; flex-direction: column; gap: 10px; background: var(--card); }
+        :root { --primary: #3b82f6; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { padding: 10px; background: var(--card); text-align: center; font-weight: bold; }
+        #controls { padding: 15px; display: flex; flex-direction: column; gap: 8px; background: var(--card); }
         #map { flex: 1; width: 100%; background: #000; }
-        .btn { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        select, input { padding: 10px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: white; }
-        #status { font-size: 12px; color: #94a3b8; text-align: center; }
+        
+        /* Zone de Logs pour Mobile */
+        #debug-log { 
+            height: 120px; 
+            background: #000; 
+            color: #10b981; 
+            font-family: monospace; 
+            font-size: 10px; 
+            padding: 5px; 
+            overflow-y: auto; 
+            border-top: 1px solid #334155;
+            white-space: pre-wrap;
+        }
+        
+        select, input { padding: 10px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: white; width: 100%; }
+        #status { font-size: 13px; color: #3b82f6; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<header>
-    <strong>CARTE TUILLES OFFLINE</strong>
-</header>
+<header>CARTE OFFLINE DEBUG</header>
 
 <div id="controls">
-    <label>1. Importer le fichier ZIP (Tuiles)</label>
+    <div id="status">En attente de fichier...</div>
     <input type="file" id="zipInput" accept=".zip">
-    
-    <label>2. Choisir le Niveau</label>
     <select id="levelSelect">
-        <option value="RDC">RDC</option>
-        <option value="N-1">N-1</option>
-        <option value="N+1">N+1</option>
-        <option value="N+2">N+2</option>
+        <option value="rdc">RDC</option>
+        <option value="n-1">N-1</option>
+        <option value="n+1">N+1</option>
+        <option value="n+2">N+2</option>
     </select>
-    <div id="status">Prêt</div>
 </div>
 
 <div id="map"></div>
 
-<!-- Librairies -->
+<!-- Zone de logs invisible par défaut, utile pour le debug -->
+<div id="debug-log">--- Logs Système ---<br></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
-    // --- 1. CONFIGURATION INITIALE ---
+    const logElement = document.getElementById('debug-log');
+    const status = document.getElementById('status');
+    const cacheName = 'offline-maps-v1';
     let map = L.map('map').setView([0, 0], 2);
     let currentLayer = null;
-    const cacheName = 'offline-maps-v1';
 
-    // Enregistrement du Service Worker
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+    // Fonction pour écrire les logs sur l'écran du téléphone
+    function logger(msg) {
+        const entry = document.createElement('div');
+        entry.textContent = `> ${msg}`;
+        logElement.appendChild(entry);
+        logElement.scrollTop = logElement.scrollHeight;
     }
 
-// --- 2. GESTION DU ZIP ET DU CACHE CORRIGÉE ---
-document.getElementById('zipInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    // --- LOGIQUE D'IMPORTATION ---
+    document.getElementById('zipInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    const status = document.getElementById('status');
-    status.innerText = "Lecture du ZIP...";
-    
-    try {
-        const zip = await JSZip.loadAsync(file);
-        const cache = await caches.open(cacheName);
-        let count = 0;
+        logger("Fichier reçu : " + file.name);
+        status.innerText = "Lecture du ZIP...";
+        
+        try {
+            const zip = await JSZip.loadAsync(file);
+            const cache = await caches.open(cacheName);
+            let count = 0;
 
-        // On récupère la liste des fichiers pour déboguer
-        const filePaths = Object.keys(zip.files);
-        console.log("Fichiers trouvés dans le ZIP :", filePaths);
+            const entries = Object.keys(zip.files);
+            logger(`Le ZIP contient ${entries.length} entrées.`);
 
-        for (const [path, entry] of Object.entries(zip.files)) {
-            // 1. Ignorer les dossiers et les fichiers système (comme __MACOSX ou Thumbs.db)
-            if (entry.dir || path.includes('__MACOSX')) continue;
+            for (const [path, entry] of Object.entries(zip.files)) {
+                if (entry.dir || path.includes('__MACOSX')) continue;
 
-            // 2. Vérifier si c'est une image
-            if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                const blob = await entry.async('blob');
-                
-                // 3. Nettoyage du chemin
-                // On enlève "Tiles/Tiles/" ou "Tiles/" au début, peu importe la casse
-                let cleanPath = path.replace(/^(tiles\/)+/i, '').toLowerCase();
-                
-                // 4. Construction de l'URL virtuelle
-                const virtualUrl = window.location.origin + '/local-tiles/' + cleanPath;
-                
-                await cache.put(virtualUrl, new Response(blob));
-                count++;
+                if (path.match(/\.(png|jpg|jpeg)$/i)) {
+                    // Analyse du chemin : Tiles/N+1/0/0/0.png
+                    // On veut garder : n+1/0/0/0.png
+                    let parts = path.split('/');
+                    
+                    // On cherche l'index du niveau (rdc, n+1, etc.)
+                    // On ignore les dossiers parents comme "Tiles"
+                    let cleanPathParts = [];
+                    let foundLevel = false;
+                    const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+
+                    for(let part of parts) {
+                        if(levels.includes(part.toLowerCase()) || foundLevel) {
+                            cleanPathParts.push(part.toLowerCase());
+                            foundLevel = true;
+                        }
+                    }
+
+                    const finalPath = cleanPathParts.join('/');
+                    if (finalPath) {
+                        const blob = await entry.async('blob');
+                        const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
+                        await cache.put(virtualUrl, new Response(blob));
+                        count++;
+                        
+                        if(count === 1) logger("Exemple chemin mappé : " + finalPath);
+                    }
+                }
             }
-        }
-        
-        if (count === 0) {
-            status.innerText = "Erreur : 0 images trouvées. Regardez la console (F12).";
-            console.error("Structure attendue non trouvée. Liste des fichiers :", filePaths);
-        } else {
-            status.innerText = "Succès : " + count + " tuiles chargées.";
-            updateMap();
-        }
-    } catch (err) {
-        console.error("Erreur détaillée:", err);
-        status.innerText = "Erreur : " + err.message;
-    }
-});
 
-    // --- 3. AFFICHAGE DE LA CARTE ---
+            status.innerText = `Succès : ${count} tuiles chargées`;
+            logger(`Import terminé. ${count} images mises en cache.`);
+            updateMap();
+
+        } catch (err) {
+            logger("ERREUR : " + err.message);
+            status.innerText = "Erreur de chargement";
+        }
+    });
+
     function updateMap() {
-        const level = document.getElementById('levelSelect').value.toLowerCase();
-        
+        const level = document.getElementById('levelSelect').value;
         if (currentLayer) map.removeLayer(currentLayer);
 
-        // On construit l'URL pour correspondre à la structure interne du ZIP
-        // Exemple : /local-tiles/rdc/{z}/{x}/{y}.png
+        // URL attendue : /local-tiles/n+1/{z}/{x}/{y}.png
         const tileUrl = window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png';
+        logger("Tentative d'affichage : " + level);
 
         currentLayer = L.tileLayer(tileUrl, {
             maxZoom: 22,
             minZoom: 0,
             noWrap: true
         }).addTo(map);
-
-        status.innerText = "Affichage niveau : " + level.toUpperCase();
     }
 
     document.getElementById('levelSelect').addEventListener('change', updateMap);
 
-    // --- 4. GESTION DES POINTS (MARKERS) ---
-    map.on('click', function(e) {
-        L.circleMarker(e.latlng, { color: 'red', radius: 8 }).addTo(map);
-        console.log("Point ajouté à : " + e.latlng.lat + ", " + e.latlng.lng);
+    // Marker au clic
+    map.on('click', (e) => {
+        L.circleMarker(e.latlng, { color: 'red', radius: 5 }).addTo(map);
     });
 
 </script>
