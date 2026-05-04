@@ -123,14 +123,6 @@ for (const [path, entry] of Object.entries(zip.files)) {
             logger(`Import terminé. ${count} images mises en cache.`);
             updateMap();
             // Test de lecture immédiat
-            const testUrl = window.location.origin + '/local-tiles/rdc/5/96/55.png';
-            caches.match(testUrl).then(res => {
-                if (res) {
-                    logger("✅ Test Cache : La tuile 5/96/55 est bien accessible !");
-                } else {
-                    logger("❌ Test Cache : La tuile est introuvable sous " + testUrl);
-                }
-
         } catch (err) {
             logger("ERREUR : " + err.message);
             status.innerText = "Erreur de chargement";
