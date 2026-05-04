@@ -53,13 +53,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
-    const logElement = document.getElementById('debug-log');
+const logElement = document.getElementById('debug-log');
     const status = document.getElementById('status');
     const cacheName = 'offline-maps-v1';
+    
+    // On initialise la carte sur un point neutre
     let map = L.map('map').setView([0, 0], 2);
     let currentLayer = null;
 
-    // Fonction pour écrire les logs sur l'écran du téléphone
     function logger(msg) {
         const entry = document.createElement('div');
         entry.textContent = `> ${msg}`;
@@ -67,65 +68,69 @@
         logElement.scrollTop = logElement.scrollHeight;
     }
 
-    // --- LOGIQUE D'IMPORTATION ---
+    // --- 1. ENREGISTREMENT ET VERIFICATION DU SW ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => logger("Service Worker : ✅ Enregistré"))
+            .catch(err => logger("Service Worker : ❌ Erreur : " + err));
+
+        navigator.serviceWorker.ready.then(() => {
+            logger("Service Worker : 🚀 Actif et prêt");
+        });
+    } else {
+        logger("Service Worker : ❌ Non supporté sur ce navigateur");
+    }
+
+    // --- 2. LOGIQUE D'IMPORTATION ---
     document.getElementById('zipInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        logger("Fichier reçu : " + file.name);
-        status.innerText = "Lecture du ZIP...";
+        logger("Fichier : " + file.name);
+        status.innerText = "Importation...";
         
         try {
             const zip = await JSZip.loadAsync(file);
             const cache = await caches.open(cacheName);
             let count = 0;
+            let firstPath = "";
 
-            const entries = Object.keys(zip.files);
-            logger(`Le ZIP contient ${entries.length} entrées.`);
+            for (const [path, entry] of Object.entries(zip.files)) {
+                if (entry.dir || path.includes('__MACOSX')) continue;
 
-for (const [path, entry] of Object.entries(zip.files)) {
-            // Log de TOUT ce qui passe pour comprendre ce que voit le téléphone
-            logger("Analyse : " + path);
-
-            if (entry.dir || path.includes('__MACOSX')) continue;
-
-            if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                const blob = await entry.async('blob');
-                
-                // On transforme le chemin en minuscules : "tiles/n+1/0/0/0.png"
-                let p = path.toLowerCase();
-                
-                // On cherche où commence le niveau (rdc, n-1, n+1, n+2)
-                let finalPath = "";
-                const segments = p.split('/');
-                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
-
-                // On reconstruit le chemin à partir du nom du niveau
-                let startIndex = segments.findIndex(seg => levels.includes(seg));
-                
-                if (startIndex !== -1) {
-                    finalPath = segments.slice(startIndex).join('/');
-                } else {
-                    // Si on ne trouve pas de dossier de niveau, on prend juste le nom du fichier
-                    // Utile si le ZIP est "sale"
-                    finalPath = segments.join('/');
-                }
-
-                if (finalPath) {
-                    const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
-                    await cache.put(virtualUrl, new Response(blob));
-                    count++;
+                if (path.match(/\.(png|jpg|jpeg)$/i)) {
+                    const blob = await entry.async('blob');
+                    let p = path.toLowerCase();
+                    
+                    const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+                    const segments = p.split('/');
+                    let startIndex = segments.findIndex(seg => levels.includes(seg));
+                    
+                    if (startIndex !== -1) {
+                        let finalPath = segments.slice(startIndex).join('/');
+                        // On construit l'URL exacte que Leaflet va demander
+                        const virtualUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'local-tiles/' + finalPath;
+                        
+                        await cache.put(virtualUrl, new Response(blob));
+                        if(count === 0) firstPath = virtualUrl;
+                        count++;
+                    }
                 }
             }
-        }
 
-            status.innerText = `Succès : ${count} tuiles chargées`;
-            logger(`Import terminé. ${count} images mises en cache.`);
+            status.innerText = `Succès : ${count} tuiles`;
+            logger(`Import terminé. ${count} images en cache.`);
+            
+            // --- TEST DE CACHE IMMEDIAT ---
+            if(firstPath) {
+                const match = await caches.match(firstPath);
+                logger(match ? "✅ Test Cache : OK" : "❌ Test Cache : ÉCHEC (URL mal formée)");
+                logger("URL testée : " + firstPath);
+            }
+
             updateMap();
-            // Test de lecture immédiat
         } catch (err) {
-            logger("ERREUR : " + err.message);
-            status.innerText = "Erreur de chargement";
+            logger("ERREUR ZIP : " + err.message);
         }
     });
 
@@ -133,24 +138,29 @@ for (const [path, entry] of Object.entries(zip.files)) {
         const level = document.getElementById('levelSelect').value;
         if (currentLayer) map.removeLayer(currentLayer);
 
-        // URL attendue : /local-tiles/n+1/{z}/{x}/{y}.png
-        const tileUrl = window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png';
-        logger("Tentative d'affichage : " + level);
+        // Construction de l'URL pour Leaflet
+        const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+        const tileUrl = baseUrl + 'local-tiles/' + level + '/{z}/{x}/{y}.png';
+        
+        logger("Affichage niveau : " + level);
 
         currentLayer = L.tileLayer(tileUrl, {
             maxZoom: 22,
             minZoom: 0,
-            noWrap: true
+            noWrap: true,
+            bounds: [[-90, -180], [90, 180]] // Empêche de chercher des tuiles à l'infini
         }).addTo(map);
+
+        // Si on a des tuiles au zoom 5, on force le zoom pour "voir" quelque chose
+        map.setView([0, 0], 5); 
     }
 
     document.getElementById('levelSelect').addEventListener('change', updateMap);
 
-    // Marker au clic
     map.on('click', (e) => {
         L.circleMarker(e.latlng, { color: 'red', radius: 5 }).addTo(map);
+        logger(`Clic : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
     });
-
 </script>
 </body>
 </html>
