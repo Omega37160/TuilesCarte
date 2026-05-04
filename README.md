@@ -1,53 +1,67 @@
-# TuilesCarte
+# 🗺️ Carte Offline N-1
 
-**TuilesCarte** est un outil conçu pour manipuler, télécharger ou assembler des tuiles cartographiques. Il permet de travailler avec des services de cartes (type OpenStreetMap, Google Maps, etc.) pour générer des fonds de cartes locaux ou des assemblages d'images.
+Une application web progressive (PWA) légère permettant de visualiser des plans techniques hors-ligne, de géo-référencer des équipements et de capturer des données terrain sans connexion internet.
 
+## ✨ Fonctionnalités
 
+*   **Mode Hors-ligne Total** : Utilise l'API `CacheStorage` et les `Service Workers` pour stocker et servir les tuiles de cartes localement.
+*   **Importation ZIP** : Chargez vos propres tuiles de cartes directement depuis une archive `.zip`.
+*   **Multi-niveaux** : Gestion de différents étages ou strates (RDC, N-1, N+1, N+2).
+*   **Relevé d'Équipements** : 
+    *   Ajout de marqueurs par simple clic sur la carte.
+    *   Formulaire de saisie (Tag, Type d'équipement).
+    *   Capture photo avec renommage automatique selon le Tag.
+*   **Export de Données** : Génération d'un fichier CSV des relevés et préparation d'un e-mail d'envoi.
+*   **Logs Système** : Console intégrée pour le suivi en temps réel des opérations (import, cache, erreurs).
 
-## 🚀 Fonctionnalités
+## 🚀 Installation Rapide
 
-*   **Téléchargement de tuiles** : Récupération automatique des images selon les niveaux de zoom (Z) et les coordonnées (X, Y).
-*   **Assemblage (Stitching)** : Fusion de plusieurs tuiles pour créer une image unique à haute résolution.
-*   **Gestion des coordonnées** : Conversion entre coordonnées géographiques (Latitude/Longitude) et coordonnées de tuiles.
-*   **Support multi-sources** : Configuration facile pour utiliser différents fournisseurs de tuiles (OSM, Stamen, Satellite).
+1.  **Hébergement** : Déployez les fichiers sur un serveur supportant le HTTPS (nécessaire pour le Service Worker et l'accès caméra).
+2.  **Fichiers Requis** :
+    *   `index.html` (le code principal).
+    *   `sw.js` (le fichier Service Worker pour la gestion du cache).
+3.  **Bibliothèques Externes** (chargées via CDN) : Leaflet.js, JSZip.
 
-## 🛠️ Installation
+## 📂 Structure du ZIP de Cartes
 
-1.  Clonez le dépôt :
-    ```bash
-    git clone https://github.com/Omega37160/TuilesCarte.git
-    cd TuilesCarte
-    ```
+Pour que l'importation fonctionne, votre archive ZIP doit respecter la structure de dossiers suivante :
 
-2.  Installez les dépendances (exemple courant) :
-    ```bash
-    pip install -r requirements.txt
-    
+```text
+archive.zip
+├── rdc/
+│   └── {z}/{x}/{y}.png
+├── n-1/
+│   └── {z}/{x}/{y}.png
+└── ... (autres niveaux)
 ```
 
-## 📖 Utilisation
+## 🛠️ Utilisation
 
-### Configuration
-Éditez le fichier de configuration pour définir la zone géographique et les niveaux de zoom souhaités :
+### 1. Charger la carte
+*   Cliquez sur **"Choisir un fichier"** et sélectionnez votre archive `.zip`.
+*   Attendez que les logs affichent le succès de l'importation (ex: `Succès : 450 tuiles`).
+*   Sélectionnez le niveau souhaité dans le menu déroulant.
 
-```json
-{
-  "zoom_min": 10,
-  "zoom_max": 15,
-  "provider": "openstreetmap"
-}
-```
+### 2. Ajouter un équipement
+*   Cliquez sur un emplacement précis de la carte.
+*   Remplissez le nom du **Tag** et le **Type**.
+*   Prenez une photo si nécessaire (elle sera automatiquement téléchargée sur votre appareil sous le nom `TAG.jpg`).
+*   Cliquez sur **Enregistrer**.
 
-### Lancement
-Pour générer une carte, lancez le script principal :
-```bash
-python main.py --lat 47.38 --lon 0.69 --radius 5km
-```
+### 3. Exporter les données
+*   Utilisez le bouton **"📧 Envoyer CSV"** pour télécharger le récapitulatif et ouvrir votre application de messagerie.
+*   Utilisez **"🗑️ Vider Liste"** pour réinitialiser les données locales (`localStorage`).
 
-## 🗺️ Structure du Système de Tuiles
-Le projet repose sur la hiérarchie standard des tuiles web où chaque niveau de zoom divise le monde en $2^z \times 2^z$ tuiles.
+## ⚙️ Détails Techniques
 
+*   **Moteur de carte** : [Leaflet 1.9.4](https://leafletjs.com/)
+*   **Stockage local** : 
+    *   `CacheStorage` pour les images (tuiles).
+    *   `LocalStorage` pour les données textuelles des équipements.
+*   **Format d'export** : CSV (séparateur point-virgule `;`).
 
+## ⚠️ Notes Importantes
 
-## 🤝 Contribution
-Les contributions sont les bienvenues ! 
+*   **Service Worker** : Assurez-vous de créer un fichier `sw.js` (même vide ou configuré pour le cache statique) à la racine, sinon certaines fonctionnalités de mise en cache pourraient être limitées.
+*   **Permissions** : L'application demandera l'accès à la caméra pour la capture de photos d'équipements.
+*   **Navigateurs** : Optimisé pour Chrome (Android) et Safari (iOS).
