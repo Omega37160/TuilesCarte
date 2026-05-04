@@ -59,34 +59,36 @@
         navigator.serviceWorker.register('sw.js');
     }
 
-    // --- 2. GESTION DU ZIP ET DU CACHE ---
-// --- 2. GESTION DU ZIP ET DU CACHE ---
+// --- 2. GESTION DU ZIP ET DU CACHE CORRIGÉE ---
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const status = document.getElementById('status');
-    status.innerText = "Extraction en cours...";
+    status.innerText = "Lecture du ZIP...";
     
     try {
         const zip = await JSZip.loadAsync(file);
         const cache = await caches.open(cacheName);
         let count = 0;
 
+        // On récupère la liste des fichiers pour déboguer
+        const filePaths = Object.keys(zip.files);
+        console.log("Fichiers trouvés dans le ZIP :", filePaths);
+
         for (const [path, entry] of Object.entries(zip.files)) {
-            // On vérifie si c'est un fichier image
-            if (!entry.dir && path.match(/\.(png|jpg|jpeg)$/i)) {
+            // 1. Ignorer les dossiers et les fichiers système (comme __MACOSX ou Thumbs.db)
+            if (entry.dir || path.includes('__MACOSX')) continue;
+
+            // 2. Vérifier si c'est une image
+            if (path.match(/\.(png|jpg|jpeg)$/i)) {
                 const blob = await entry.async('blob');
                 
-                // Nettoyage du chemin : 
-                // On transforme en minuscule pour la cohérence
-                let cleanPath = path.toLowerCase();
+                // 3. Nettoyage du chemin
+                // On enlève "Tiles/Tiles/" ou "Tiles/" au début, peu importe la casse
+                let cleanPath = path.replace(/^(tiles\/)+/i, '').toLowerCase();
                 
-                // On enlève le dossier racine "tiles/" s'il existe
-                // Utilisation d'une regex pour ignorer la casse au cas où
-                cleanPath = cleanPath.replace(/^tiles\//, '');
-                
-                // IMPORTANT : On construit l'URL virtuelle
+                // 4. Construction de l'URL virtuelle
                 const virtualUrl = window.location.origin + '/local-tiles/' + cleanPath;
                 
                 await cache.put(virtualUrl, new Response(blob));
@@ -95,13 +97,14 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
         }
         
         if (count === 0) {
-            status.innerText = "Erreur : Aucune image trouvée dans le ZIP. Vérifiez la structure.";
+            status.innerText = "Erreur : 0 images trouvées. Regardez la console (F12).";
+            console.error("Structure attendue non trouvée. Liste des fichiers :", filePaths);
         } else {
             status.innerText = "Succès : " + count + " tuiles chargées.";
             updateMap();
         }
     } catch (err) {
-        console.error(err);
+        console.error("Erreur détaillée:", err);
         status.innerText = "Erreur : " + err.message;
     }
 });
