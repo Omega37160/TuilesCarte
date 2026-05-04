@@ -60,36 +60,41 @@
     }
 
     // --- 2. GESTION DU ZIP ET DU CACHE ---
-    document.getElementById('zipInput').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+document.getElementById('zipInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-        const status = document.getElementById('status');
-        status.innerText = "Extraction et mise en cache...";
-        
-        try {
-            const zip = await JSZip.loadAsync(file);
-            const cache = await caches.open(cacheName);
-            let count = 0;
+    const status = document.getElementById('status');
+    status.innerText = "Extraction en cours...";
+    
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const cache = await caches.open(cacheName);
+        let count = 0;
 
-            // On parcourt les fichiers du ZIP
-            for (const [path, entry] of Object.entries(zip.files)) {
-                if (!entry.dir && (path.endsWith('.png') || path.endsWith('.jpg'))) {
-                    const blob = await entry.async('blob');
-                    // On crée une URL virtuelle basée sur le nom du fichier dans le ZIP
-                    // On force le chemin en minuscule pour éviter les erreurs de frappe
-                    const virtualUrl = window.location.origin + '/local-tiles/' + path.toLowerCase();
-                    await cache.put(virtualUrl, new Response(blob));
-                    count++;
+        for (const [path, entry] of Object.entries(zip.files)) {
+            if (!entry.dir && path.match(/\.(png|jpg|jpeg)$/i)) {
+                const blob = await entry.async('blob');
+                
+                // --- CORRECTION DU CHEMIN ---
+                let cleanPath = path.toLowerCase();
+                
+                // Si le chemin commence par "tiles/", on l'enlève pour avoir directement "n+1/..."
+                if (cleanPath.startsWith('tiles/')) {
+                    cleanPath = cleanPath.replace('tiles/', '');
                 }
+                
+                const virtualUrl = window.location.origin + '/local-tiles/' + cleanPath;
+                await cache.put(virtualUrl, new Response(blob));
+                count++;
             }
-            status.innerText = "Succès : " + count + " tuiles chargées.";
-            updateMap();
-        } catch (err) {
-            status.innerText = "Erreur : " + err.message;
-            console.error(err);
         }
-    });
+        status.innerText = "Succès : " + count + " tuiles chargées.";
+        updateMap();
+    } catch (err) {
+        status.innerText = "Erreur : " + err.message;
+    }
+});
 
     // --- 3. AFFICHAGE DE LA CARTE ---
     function updateMap() {
