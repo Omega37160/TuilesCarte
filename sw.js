@@ -1,14 +1,16 @@
 const cacheName = 'offline-maps-v1';
 
+self.addEventListener('install', (event) => {
+    self.skipWaiting(); // Force le SW à s'activer immédiatement
+});
+
 self.addEventListener('fetch', (event) => {
-    // On intercepte uniquement les requêtes vers nos tuiles locales
-    if (event.request.url.includes('/local-tiles/')) {
+    // On intercepte si l'URL contient 'local-tiles'
+    if (event.request.url.includes('local-tiles')) {
         event.respondWith(
-            caches.open(cacheName).then((cache) => {
-                return cache.match(event.request).then((response) => {
-                    // Si on trouve dans le cache, on renvoie, sinon on tente le réseau
-                    return response || fetch(event.request);
-                });
+            caches.match(event.request).then((response) => {
+                // Retourne le cache si trouvé, sinon va sur le réseau
+                return response || fetch(event.request);
             })
         );
     }
