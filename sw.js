@@ -11,10 +11,10 @@ self.addEventListener('install', (e) => {
 
 // Interception des requêtes
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Si la tuile est dans le cache, on la renvoie, sinon on tente le réseau
-      return response || fetch(event.request);
-    })
-  );
+    event.respondWith(
+        caches.match(event.request).then((response) => {
+            // Retourne la tuile du cache, sinon va sur internet
+            return response || fetch(event.request);
+        })
+    );
 });
