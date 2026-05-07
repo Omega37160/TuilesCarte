@@ -1,17 +1,39 @@
-const cacheName = 'offline-maps-v1';
-
-self.addEventListener('install', (event) => {
-    self.skipWaiting(); // Force le SW à s'activer immédiatement
-});
-
+const CACHE_NAME = 'offline-maps-v1';
 self.addEventListener('fetch', (event) => {
-    // On intercepte si l'URL contient 'local-tiles'
-    if (event.request.url.includes('local-tiles')) {
+    const url = event.request.url;
+    
+    if (url.includes('/local-tiles/')) {
         event.respondWith(
-            caches.match(event.request).then((response) => {
-                // Retourne le cache si trouvé, sinon va sur le réseau
-                return response || fetch(event.request);
+            caches.open(CACHE_NAME).then(cache => {
+                return cache.match(event.request).then(response => {
+                    if (response) {
+                        return response;
+                    }
+                    // Tuile non trouvée : retourner une image transparente
+                    return new Response(
+                        new Uint8Array([
+                            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+                            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+                            0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+                            0x01, 0x03, 0x00, 0x00, 0x00, 0x66, 0xBC, 0x3A,
+                            0x25, 0x00, 0x00, 0x00, 0x03, 0x50, 0x4C, 0x54,
+                            0x45, 0x00, 0x00, 0x00, 0xA7, 0x7A, 0x3D, 0xDA,
+                            0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4E, 0x53,
+                            0x00, 0x40, 0xE6, 0xD8, 0x66, 0x00, 0x00, 0x00,
+                            0x1F, 0x49, 0x44, 0x41, 0x54, 0x68, 0xDE, 0xED,
+                            0xC1, 0x01, 0x0D, 0x00, 0x00, 0x00, 0xC2, 0xA0,
+                            0xF7, 0x4F, 0x6D, 0x0E, 0x37, 0xA0, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBE, 0x0D,
+                            0x21, 0x00, 0x00, 0x01, 0x9A, 0x60, 0xE1, 0xD5,
+                            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+                            0xAE, 0x42, 0x60, 0x82
+                        ]),
+                        { headers: { 'Content-Type': 'image/png' } }
+                    );
+                });
             })
         );
     }
 });
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', () => self.clients.claim());
