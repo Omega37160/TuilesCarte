@@ -70,66 +70,96 @@
 
 <script>
     const logElement = document.getElementById('debug-log');
-    const status = document.getElementById('status');
-    const cacheName = 'offline-maps-v1';
-    let map = L.map('map').setView([0, 0], 2);
-    let currentLayer = null;
-    let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
-    let tempCoords = null;
+const status = document.getElementById('status');
+const cacheName = 'offline-maps-v1';
+let map = L.map('map').setView([0, 0], 2);
+let currentLayer = null;
+let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
+let tempCoords = null;
 
-    function logger(msg) {
-        const entry = document.createElement('div');
-        entry.textContent = `> ${msg}`;
-        logElement.appendChild(entry);
-        logElement.scrollTop = logElement.scrollHeight;
-    }
+function logger(msg) {
+    const entry = document.createElement('div');
+    entry.textContent = `> ${msg}`;
+    logElement.appendChild(entry);
+    logElement.scrollTop = logElement.scrollHeight;
+}
 
-    // --- IMPORTATION ZIP ---
-    document.getElementById('zipInput').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        status.innerText = "Importation...";
-        try {
-            const zip = await JSZip.loadAsync(file);
+// --- INTERCEPTEUR DE CACHE (Pour le débug) ---
+// Cette fonction permet de voir si Leaflet demande une URL que nous avons en cache
+window.fetch = ((originalFetch) => {
+    return async (...args) => {
+        const url = args[0];
+        if (url.includes('local-tiles')) {
             const cache = await caches.open(cacheName);
-            let count = 0;
-            for (const [path, entry] of Object.entries(zip.files)) {
-                if (entry.dir || path.includes('__MACOSX')) continue;
-                if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                    const blob = await entry.async('blob');
-                    const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
-                    const segments = path.toLowerCase().split('/');
-                    let startIndex = segments.findIndex(seg => levels.includes(seg));
-                    if (startIndex !== -1) {
-                        const finalPath = segments.slice(startIndex).join('/');
-                        const virtualUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'local-tiles/' + finalPath;
-                        await cache.put(virtualUrl, new Response(blob));
-                        count++;
-                    }
+            const match = await cache.match(url);
+            if (match) {
+                logger("✅ CHARGEMENT : " + url.split('local-tiles/')[1]);
+            } else {
+                logger("❌ INTROUVABLE : " + url.split('local-tiles/')[1]);
+            }
+        }
+        return originalFetch(...args);
+    };
+})(window.fetch);
+
+// --- IMPORTATION ZIP ---
+document.getElementById('zipInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    status.innerText = "Importation...";
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const cache = await caches.open(cacheName);
+        let count = 0;
+        
+        // Nettoyage du cache précédent pour éviter les conflits
+        await caches.delete(cacheName);
+        const newCache = await caches.open(cacheName);
+
+        for (const [path, entry] of Object.entries(zip.files)) {
+            if (entry.dir || path.includes('__MACOSX')) continue;
+            
+            if (path.match(/\.(png|jpg|jpeg)$/i)) {
+                const blob = await entry.async('blob');
+                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+                const segments = path.toLowerCase().split('/');
+                
+                let startIndex = segments.findIndex(seg => levels.includes(seg));
+                
+                if (startIndex !== -1) {
+                    const finalPath = segments.slice(startIndex).join('/');
+                    // Construction de l'URL virtuelle
+                    const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
+                    
+                    await newCache.put(virtualUrl, new Response(blob));
+                    if(count === 0) logger("📦 PREMIER STOCKAGE : " + finalPath);
+                    count++;
                 }
             }
-            status.innerText = `Succès : ${count} tuiles`;
-            updateMap();
-        } catch (err) { logger("ERREUR ZIP : " + err.message); }
-    });
+        }
+        status.innerText = `Succès : ${count} tuiles`;
+        logger(`SYSTÈME : ${count} fichiers en cache.`);
+        updateMap();
+    } catch (err) { logger("ERREUR ZIP : " + err.message); }
+});
 
 function updateMap() {
-    const level = document.getElementById('levelSelect').value;
+    const level = document.getElementById('levelSelect').value.toLowerCase();
     if (currentLayer) map.removeLayer(currentLayer);
     
-    // On construit l'URL absolue sans se soucier du dossier courant
-    const tileUrl = window.location.origin + '/local-tiles/' + level.toLowerCase() + '/{z}/{x}/{y}.png';
+    // On s'assure que l'URL demandée correspond STRICTEMENT à l'URL stockée
+    const tileUrl = window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png';
     
-    logger("Affichage niveau : " + level);
+    logger("🗺️ AFFICHAGE NIVEAU : " + level);
+    logger("🔗 URL TYPE : " + tileUrl.replace(window.location.origin, ""));
 
     currentLayer = L.tileLayer(tileUrl, { 
         maxZoom: 22, 
         minZoom: 0, 
         noWrap: true,
-        continuousWorld: true // Important pour les cartes non-géographiques (plans)
+        bounds: [[-90, -180], [90, 180]] // Aide Leaflet à savoir où chercher
     }).addTo(map);
 
-    // On force un zoom arrière pour essayer de voir le plan
     map.setView([0, 0], 2); 
     renderMarkers();
 }
