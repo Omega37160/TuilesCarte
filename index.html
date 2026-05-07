@@ -370,40 +370,49 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
 async function updateMap() {
     const level = document.getElementById('levelSelect').value.toLowerCase();
 
-    if (currentLayer) {
-        map.removeLayer(currentLayer);
-    }
+    if (currentLayer) map.removeLayer(currentLayer);
 
-    const tileUrl = window.location.origin + `/local-tiles/${level}/{z}/{x}/{y}.png`;
+    logger(`--- Chargement niveau : ${level} ---`);
 
-    logger(`Chargement des tuiles : ${level}`);
+    const tileUrl = `/local-tiles/${level}/{z}/{x}/{y}.png`;
 
     currentLayer = L.tileLayer(tileUrl, {
         tileSize: 256,
         minZoom: 0,
-        maxZoom: 5,           // ← baisse ça au début pour tester
+        maxZoom: 6,
         noWrap: true,
-        bounds: L.latLngBounds([[0,0], [8192,8192]]),
-        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' // tuile grise si erreur
+        bounds: [[0, 0], [8192, 8192]],
+        // Tuile de secours visible (gris) si erreur
+        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
     }).addTo(map);
 
-    // Centre sur une tuile existante
+    // Cherche une tuile existante pour centrer
     try {
         const cache = await caches.open(cacheName);
         const keys = await cache.keys();
-        const sample = keys.find(k => k.url.includes(`/local-tiles/${level}/`));
+        
+        const sampleTile = keys.find(k => 
+            k.url.includes(`/local-tiles/${level}/`) && k.url.endsWith('.png')
+        );
 
-        if (sample) {
-            const parts = sample.url.split('/');
-            const z = parseInt(parts[parts.length-3]);
-            const x = parseInt(parts[parts.length-2]);
-            const y = parseInt(parts[parts.length-1].split('.')[0]);
+        if (sampleTile) {
+            const parts = sampleTile.url.split('/');
+            const z = parseInt(parts[parts.length - 3]);
+            const x = parseInt(parts[parts.length - 2]);
+            const y = parseInt(parts[parts.length - 1].split('.')[0]);
 
             const point = L.point(x * 256, y * 256);
-            const latlng = map.unproject(point, z);
-            map.setView(latlng, Math.min(z, 4)); // zoom raisonnable
+            const latlng = map.unproject(point, z || 0);
+            
+            map.setView(latlng, Math.max(0, Math.min(z || 2, 5)));
+            logger(`✅ Centré sur tuile Z=${z} X=${x} Y=${y}`);
+        } else {
+            logger(`⚠️ Aucune tuile trouvée pour ${level}`, "warn");
+            map.setView([0, 0], 2);
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error(e);
+    }
 }
 //////////////////////////////////////////////////////////
 // RENDER MARKERS
