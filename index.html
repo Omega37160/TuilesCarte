@@ -187,30 +187,35 @@ function closeModal() {
 }
 
 async function saveEquipment() {
-    const nom = document.getElementById('userName').value; // Nouveau
+    const nom = document.getElementById('userName').value;
     const tag = document.getElementById('tagName').value;
     const type = document.getElementById('tagType').value;
-    const niveau = document.getElementById('levelSelect').value; // Récupère le niveau actuel
+    const niveau = document.getElementById('levelSelect').value; 
     const photoFile = document.getElementById('photoInput').files[0];
 
-    if (!tag || !nom) { alert("Le nom et le Tag sont obligatoires"); return; }
+    if (!tag || !nom) { alert("Nom et Tag obligatoires"); return; }
 
+    // --- PARTIE PHOTO : RENOMMAGE ET ENREGISTREMENT ---
     if (photoFile) {
         const extension = photoFile.name.split('.').pop();
         const newFileName = `${tag}.${extension}`;
+        
         const link = document.createElement('a');
         link.href = URL.createObjectURL(photoFile);
-        link.download = newFileName;
+        link.download = newFileName; // C'est ici que le renommage se fait
+        document.body.appendChild(link);
         link.click();
-        logger(`Photo enregistrée : ${newFileName}`);
+        document.body.removeChild(link);
+        
+        logger(`Photo renommée enregistrée : ${newFileName}`);
     }
 
-    // Préparation de l'objet sans la date, mais avec Nom et Niveau
+    // --- PARTIE DONNÉES ---
     const newItem = {
         nom,
         tag,
         type,
-        niveau, // Ajout du niveau
+        niveau,
         lat: tempCoords.lat.toFixed(6),
         lng: tempCoords.lng.toFixed(6)
     };
@@ -221,15 +226,13 @@ async function saveEquipment() {
     L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
      .bindPopup(`<b>${tag}</b><br>${type} (${niveau})`).openPopup();
 
-    logger(`Équipement ${tag} enregistré au niveau ${niveau}`);
     closeModal();
 }
-
 function sendCsvByEmail() {
     if (equipmentData.length === 0) { alert("Le CSV est vide !"); return; }
 
-    // Mise à jour de l'en-tête : Nom;Tag;Type;Niveau;Latitude;Longitude
-    let csvContent = "Nom;Tag;Type;Niveau;Latitude;Longitude\n";
+    // Header : Nom;Tag;Type;Niveau;Latitude;Longitude
+    let csvContent = "\uFEFFNom;Tag;Type;Niveau;Latitude;Longitude\n";
     
     equipmentData.forEach(item => {
         csvContent += `${item.nom};${item.tag};${item.type};${item.niveau};${item.lat};${item.lng}\n`;
@@ -237,15 +240,19 @@ function sendCsvByEmail() {
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
     const link = document.createElement('a');
     link.href = url;
     link.download = "releve_equipements.csv";
+    
+    document.body.appendChild(link);
     link.click();
-
+    
     setTimeout(() => {
-        window.location.href = `mailto:?subject=Relevé Terrain&body=Bonjour, veuillez trouver ci-joint le relevé CSV comprenant ${equipmentData.length} équipements.`;
-    }, 1000);
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        // On ouvre le mail ensuite
+        window.location.href = `mailto:?subject=Relevé Terrain&body=Fichier CSV joint.`;
+    }, 500);
 }
 function clearCsv() {
     if (confirm("Voulez-vous vraiment vider tous les équipements enregistrés ?")) {
