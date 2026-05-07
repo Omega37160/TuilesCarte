@@ -15,7 +15,7 @@
         select, input { padding: 12px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: white; width: 100%; box-sizing: border-box; }
         #status { font-size: 13px; color: #3b82f6; font-weight: bold; }
         .action-buttons { display: flex; padding: 10px; gap: 10px; background: var(--card); }
-        button { cursor: pointer; font-weight: bold; }
+        button { cursor: pointer; font-weight: bold; border: none; border-radius: 5px; padding: 12px; }
     </style>
 </head>
 <body>
@@ -36,11 +36,11 @@
 <div id="map"></div>
 
 <div class="action-buttons">
-    <button onclick="sendCsvByEmail()" style="background: #10b981; color: white; padding: 12px; border: none; border-radius: 5px; flex: 1;">📧 Envoyer CSV</button>
-    <button onclick="clearCsv()" style="background: #ef4444; color: white; padding: 12px; border: none; border-radius: 5px; flex: 1;">🗑️ Vider Liste</button>
+    <button onclick="downloadCsv()" style="background: #3b82f6; color: white; flex: 1;">💾 Télécharger CSV</button>
+    <button onclick="sendCsvByEmail()" style="background: #10b981; color: white; flex: 1;">📧 Email</button>
+    <button onclick="clearCsv()" style="background: #ef4444; color: white; flex: 1;">🗑️ Vider</button>
 </div>
 
-<!-- Modal de saisie -->
 <div id="equipmentModal" style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 20px; z-index: 2000; border: 1px solid #334155; width: 85%; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
     <h3 style="margin-top:0;">Nouvel Équipement</h3>
     <label>Nom du Tag :</label>
@@ -58,8 +58,8 @@
     <input type="file" id="photoInput" accept="image/*" capture="environment" style="margin-bottom:10px;">
     
     <div style="margin-top: 15px; display: flex; gap: 10px;">
-        <button onclick="saveEquipment()" style="background: var(--primary); color: white; border: none; padding: 12px; flex: 1; border-radius:5px;">Enregistrer</button>
-        <button onclick="closeModal()" style="background: #64748b; color: white; border: none; padding: 12px; flex: 1; border-radius:5px;">Annuler</button>
+        <button onclick="saveEquipment()" style="background: var(--primary); color: white; flex: 1;">Enregistrer</button>
+        <button onclick="closeModal()" style="background: #64748b; color: white; flex: 1;">Annuler</button>
     </div>
 </div>
 
@@ -84,36 +84,24 @@
         logElement.scrollTop = logElement.scrollHeight;
     }
 
-    // --- SERVICE WORKER ---
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => logger("Service Worker : ✅ Enregistré"))
-            .catch(err => logger("Service Worker : ❌ Erreur : " + err));
-    }
-
     // --- IMPORTATION ZIP ---
     document.getElementById('zipInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         status.innerText = "Importation...";
         try {
             const zip = await JSZip.loadAsync(file);
             const cache = await caches.open(cacheName);
             let count = 0;
-
             for (const [path, entry] of Object.entries(zip.files)) {
                 if (entry.dir || path.includes('__MACOSX')) continue;
-
                 if (path.match(/\.(png|jpg|jpeg)$/i)) {
                     const blob = await entry.async('blob');
-                    let p = path.toLowerCase();
                     const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
-                    const segments = p.split('/');
+                    const segments = path.toLowerCase().split('/');
                     let startIndex = segments.findIndex(seg => levels.includes(seg));
-                    
                     if (startIndex !== -1) {
-                        let finalPath = segments.slice(startIndex).join('/');
+                        const finalPath = segments.slice(startIndex).join('/');
                         const virtualUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'local-tiles/' + finalPath;
                         await cache.put(virtualUrl, new Response(blob));
                         count++;
@@ -121,37 +109,21 @@
                 }
             }
             status.innerText = `Succès : ${count} tuiles`;
-            logger(`Import terminé : ${count} tuiles en cache.`);
             updateMap();
-        } catch (err) {
-            logger("ERREUR ZIP : " + err.message);
-        }
+        } catch (err) { logger("ERREUR ZIP : " + err.message); }
     });
 
     function updateMap() {
         const level = document.getElementById('levelSelect').value;
         if (currentLayer) map.removeLayer(currentLayer);
-
         const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
         const tileUrl = baseUrl + 'local-tiles/' + level + '/{z}/{x}/{y}.png';
-        
-        currentLayer = L.tileLayer(tileUrl, {
-            maxZoom: 22,
-            minZoom: 0,
-            noWrap: true,
-            bounds: [[-90, -180], [90, 180]]
-        }).addTo(map);
-
+        currentLayer = L.tileLayer(tileUrl, { maxZoom: 22, minZoom: 0, noWrap: true }).addTo(map);
         map.setView([0, 0], 5);
-        logger("Niveau affiché : " + level);
-        
-        // Recharger les marqueurs existants pour ce niveau (optionnel, ici on affiche tout)
         renderMarkers();
     }
 
     function renderMarkers() {
-        // Optionnel : filtrer par niveau si vous voulez n'afficher que les points du niveau sélectionné
-        // Pour l'instant on affiche tout pour éviter de perdre des points de vue
         equipmentData.forEach(item => {
             L.circleMarker([item.lat, item.lng], { color: 'yellow', radius: 6 })
              .addTo(map)
@@ -161,7 +133,6 @@
 
     document.getElementById('levelSelect').addEventListener('change', updateMap);
 
-    // --- CAPTURE ÉQUIPEMENT ---
     map.on('click', (e) => {
         tempCoords = e.latlng;
         document.getElementById('equipmentModal').style.display = 'block';
@@ -176,72 +147,80 @@
     async function saveEquipment() {
         const tag = document.getElementById('tagName').value;
         const type = document.getElementById('tagType').value;
-        const level = document.getElementById('levelSelect').value; // Récupère le niveau actuel
+        const level = document.getElementById('levelSelect').value.toUpperCase();
         const photoFile = document.getElementById('photoInput').files[0];
 
         if (!tag) { alert("Le nom du Tag est obligatoire"); return; }
 
+        // Sauvegarde des données
+        const newItem = {
+            tag, type, level,
+            lat: tempCoords.lat.toFixed(6),
+            lng: tempCoords.lng.toFixed(6),
+            date: new Date().toLocaleString()
+        };
+        equipmentData.push(newItem);
+        localStorage.setItem('equipments', JSON.stringify(equipmentData));
+
+        // Affichage carte
+        L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
+         .bindPopup(`<b>${tag}</b> [${level}]<br>${type}`).openPopup();
+
+        // Gestion Photo (on le fait en dernier)
         if (photoFile) {
             const extension = photoFile.name.split('.').pop();
             const newFileName = `${tag}_${level}.${extension}`;
             const link = document.createElement('a');
             link.href = URL.createObjectURL(photoFile);
             link.download = newFileName;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
 
-        const newItem = {
-            tag,
-            type,
-            level: level.toUpperCase(), // Ajout du niveau
-            lat: tempCoords.lat.toFixed(6),
-            lng: tempCoords.lng.toFixed(6),
-            date: new Date().toLocaleString()
-        };
-
-        equipmentData.push(newItem);
-        localStorage.setItem('equipments', JSON.stringify(equipmentData));
-
-        L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
-         .bindPopup(`<b>${tag}</b> [${level.toUpperCase()}]<br>${type}`).openPopup();
-
-        logger(`Équipement ${tag} enregistré au niveau ${level}.`);
+        logger(`Enregistré : ${tag} (${level})`);
         closeModal();
     }
 
-    // --- EXPORT CSV ---
-    function sendCsvByEmail() {
-        if (equipmentData.length === 0) { alert("Le CSV est vide !"); return; }
-
-        // Ajout de la colonne "Niveau" dans l'en-tête
+    function generateCsvBlob() {
         let csvContent = "Tag;Type;Niveau;Latitude;Longitude;Date\n";
         equipmentData.forEach(item => {
             csvContent += `${item.tag};${item.type};${item.level};${item.lat};${item.lng};${item.date}\n`;
         });
+        return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    }
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    function downloadCsv() {
+        if (equipmentData.length === 0) { alert("Aucune donnée !"); return; }
+        const blob = generateCsvBlob();
         const url = URL.createObjectURL(blob);
-        
         const link = document.createElement('a');
         link.href = url;
-        link.download = "releve_terrain.csv";
+        link.download = `releve_terrain_${new Date().getTime()}.csv`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        logger("Fichier CSV téléchargé.");
+    }
 
+    function sendCsvByEmail() {
+        if (equipmentData.length === 0) { alert("Le CSV est vide !"); return; }
+        // On télécharge d'abord le CSV pour sécurité
+        downloadCsv();
+        // Puis on ouvre le mail
         setTimeout(() => {
-            window.location.href = `mailto:?subject=Relevé Terrain&body=Export de ${equipmentData.length} équipements effectué sur le terrain.`;
-        }, 1000);
+            window.location.href = `mailto:?subject=Relevé Terrain&body=Veuillez trouver ci-joint le relevé de ${equipmentData.length} équipements.`;
+        }, 500);
     }
 
     function clearCsv() {
         if (confirm("Voulez-vous vraiment vider tous les équipements ?")) {
             equipmentData = [];
             localStorage.removeItem('equipments');
-            logger("Données vidées.");
             location.reload();
         }
     }
     
-    // Initialisation
     window.onload = renderMarkers;
 </script>
 </body>
