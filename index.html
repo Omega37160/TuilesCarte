@@ -102,7 +102,7 @@ window.fetch = ((originalFetch) => {
     };
 })(window.fetch);
 
-// --- IMPORTATION ZIP ---
+// --- IMPORTATION ZIP (Version corrigée pour structure profonde) ---
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -110,35 +110,37 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
     try {
         const zip = await JSZip.loadAsync(file);
         const cache = await caches.open(cacheName);
-        let count = 0;
-        
-        // Nettoyage du cache précédent pour éviter les conflits
         await caches.delete(cacheName);
         const newCache = await caches.open(cacheName);
-
+        
+        let count = 0;
         for (const [path, entry] of Object.entries(zip.files)) {
             if (entry.dir || path.includes('__MACOSX')) continue;
             
             if (path.match(/\.(png|jpg|jpeg)$/i)) {
                 const blob = await entry.async('blob');
-                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
                 const segments = path.toLowerCase().split('/');
                 
-                let startIndex = segments.findIndex(seg => levels.includes(seg));
-                
-                if (startIndex !== -1) {
-                    const finalPath = segments.slice(startIndex).join('/');
-                    // Construction de l'URL virtuelle
+                // On cherche l'index du niveau (rdc, n-1, etc.)
+                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+                let lvlIndex = segments.findIndex(seg => levels.includes(seg));
+
+                if (lvlIndex !== -1) {
+                    // ON RÉCUPÈRE UNIQUEMENT LES 3 DERNIERS SEGMENTS (z, x, y)
+                    // Cela permet de supprimer les dossiers intermédiaires inutiles
+                    const zxy = segments.slice(-3); // Prend [z, x, y.png]
+                    const levelName = segments[lvlIndex];
+                    
+                    const finalPath = `${levelName}/${zxy.join('/')}`;
                     const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
                     
                     await newCache.put(virtualUrl, new Response(blob));
-                    if(count === 0) logger("📦 PREMIER STOCKAGE : " + finalPath);
+                    if (count === 0) logger("📦 STOCKÉ COMME : " + finalPath);
                     count++;
                 }
             }
         }
         status.innerText = `Succès : ${count} tuiles`;
-        logger(`SYSTÈME : ${count} fichiers en cache.`);
         updateMap();
     } catch (err) { logger("ERREUR ZIP : " + err.message); }
 });
@@ -147,21 +149,20 @@ function updateMap() {
     const level = document.getElementById('levelSelect').value.toLowerCase();
     if (currentLayer) map.removeLayer(currentLayer);
     
-    // On s'assure que l'URL demandée correspond STRICTEMENT à l'URL stockée
     const tileUrl = window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png';
     
-    logger("🗺️ AFFICHAGE NIVEAU : " + level);
-    logger("🔗 URL TYPE : " + tileUrl.replace(window.location.origin, ""));
+    logger("🗺️ NIVEAU : " + level);
 
     currentLayer = L.tileLayer(tileUrl, { 
         maxZoom: 22, 
         minZoom: 0, 
         noWrap: true,
-        bounds: [[-90, -180], [90, 180]] // Aide Leaflet à savoir où chercher
+        // Petite astuce si tes tuiles ne sont pas en 256x256
+        tileSize: 256 
     }).addTo(map);
 
+    // On se place au centre du plan (0,0) au zoom 2 pour voir si quelque chose apparaît
     map.setView([0, 0], 2); 
-    renderMarkers();
 }
 
     function renderMarkers() {
