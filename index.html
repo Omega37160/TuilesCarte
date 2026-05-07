@@ -144,7 +144,7 @@
         document.getElementById('photoInput').value = '';
     }
 
-    async function saveEquipment() {
+async function saveEquipment() {
         const tag = document.getElementById('tagName').value;
         const type = document.getElementById('tagType').value;
         const level = document.getElementById('levelSelect').value.toUpperCase();
@@ -152,7 +152,6 @@
 
         if (!tag) { alert("Le nom du Tag est obligatoire"); return; }
 
-        // Sauvegarde des données
         const newItem = {
             tag, type, level,
             lat: tempCoords.lat.toFixed(6),
@@ -162,21 +161,21 @@
         equipmentData.push(newItem);
         localStorage.setItem('equipments', JSON.stringify(equipmentData));
 
-        // Affichage carte
         L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
          .bindPopup(`<b>${tag}</b> [${level}]<br>${type}`).openPopup();
 
-        // Gestion Photo (on le fait en dernier)
+        // 1. TELECHARGEMENT DE LA PHOTO
         if (photoFile) {
             const extension = photoFile.name.split('.').pop();
-            const newFileName = `${tag}_${level}.${extension}`;
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(photoFile);
-            link.download = newFileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const photoLink = document.createElement('a');
+            photoLink.href = URL.createObjectURL(photoFile);
+            photoLink.download = `${tag}_${level}.${extension}`;
+            photoLink.click();
         }
+
+        // 2. TELECHARGEMENT AUTOMATIQUE DU CSV (Optionnel à chaque ajout)
+        // Si tu veux qu'il se télécharge à chaque fois, décommente la ligne suivante :
+        // downloadCsv(); 
 
         logger(`Enregistré : ${tag} (${level})`);
         closeModal();
