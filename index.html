@@ -301,6 +301,8 @@ document.getElementById('zipInput')
 
         const zip = await JSZip.loadAsync(file);
 
+        await caches.delete(cacheName);
+
         const newCache = await caches.open(cacheName);
 
         let count = 0;
@@ -707,35 +709,6 @@ function clearCsv() {
 //////////////////////////////////////////////////////////
 
 window.onload = renderMarkers;
-
-window.addEventListener('load', async () => {
-
-    renderMarkers();
-
-    const cache = await caches.open(cacheName);
-
-    const keys = await cache.keys();
-
-    const hasTiles = keys.some(k =>
-        k.url.includes('/local-tiles/')
-    );
-
-    if (hasTiles) {
-
-        logger("📦 Cache détecté");
-
-        status.innerText = "Cartes chargées depuis le cache";
-
-        updateMap();
-
-    } else {
-
-        logger("⚠️ Aucun cache trouvé");
-
-        status.innerText =
-            "Importer un ZIP de tuiles";
-    }
-});
 
 </script>
 
