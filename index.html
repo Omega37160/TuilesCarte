@@ -110,7 +110,8 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
     
     try {
         const zip = await JSZip.loadAsync(file);
-        // 1. Nettoyage TOTAL du cache pour éviter les résidus
+        
+        // 1. Suppression RADICALE du cache
         await caches.delete(cacheName);
         const newCache = await caches.open(cacheName);
         
@@ -120,37 +121,49 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
         for (const [path, entry] of Object.entries(zip.files)) {
             if (entry.dir || path.includes('__MACOSX')) continue;
             
+            // On ne prend que les fichiers qui finissent par .png ou .jpg
             if (path.match(/\.(png|jpg|jpeg)$/i)) {
                 const segments = path.toLowerCase().split('/');
+                
+                // On cherche l'index du niveau (ex: n-1)
                 let lvlIndex = segments.findIndex(seg => levels.includes(seg));
 
                 if (lvlIndex !== -1) {
-                    // On extrait le niveau et les 3 derniers chiffres (Z, X, Y)
                     const levelName = segments[lvlIndex];
-                    const zxy = segments.slice(-3); // Prend les 3 derniers : [z, x, y.png]
                     
-                    const finalPath = `${levelName}/${zxy.join('/')}`;
-                    const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
+                    // EXTRACTION DES COORDONNÉES (Z/X/Y)
+                    // On filtre pour ne garder que les segments numériques + le fichier final
+                    const coords = segments.slice(lvlIndex + 1).filter(s => s.match(/^\d+$/) || s.includes('.png') || s.includes('.jpg'));
                     
-                    // 2. On récupère le blob et on FORCE le Content-Type en image/png
-                    const blob = await entry.async('blob');
-                    const imageResponse = new Response(blob, {
-                        headers: { 'Content-Type': 'image/png' }
-                    });
+                    // On ne garde que les 3 derniers (Z, X, Y)
+                    const zxy = coords.slice(-3); 
                     
-                    await newCache.put(virtualUrl, imageResponse);
-                    
-                    if (count === 0) logger("✅ STOCKÉ : " + finalPath);
-                    count++;
+                    if (zxy.length === 3) {
+                        const finalPath = `${levelName}/${zxy[0]}/${zxy[1]}/${zxy[2]}`;
+                        const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
+                        
+                        const blob = await entry.async('blob');
+                        
+                        // FORCER LE TYPE IMAGE (Crucial pour Leaflet)
+                        const imageResponse = new Response(blob, {
+                            headers: { 
+                                'Content-Type': 'image/png',
+                                'Content-Length': blob.size.toString()
+                            }
+                        });
+                        
+                        await newCache.put(virtualUrl, imageResponse);
+                        if (count === 0) logger("✅ PREMIER FIX : " + finalPath);
+                        count++;
+                    }
                 }
             }
         }
         status.innerText = `Succès : ${count} tuiles`;
-        logger(`SYSTÈME : ${count} fichiers prêts.`);
+        logger(`SYSTÈME : Cache prêt (${count} images).`);
         updateMap();
     } catch (err) { 
-        logger("ERREUR ZIP : " + err.message); 
-        console.error(err);
+        logger("ERREUR : " + err.message);
     }
 });
 
