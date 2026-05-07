@@ -69,101 +69,98 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
-    const logElement = document.getElementById('debug-log');
+const logElement = document.getElementById('debug-log');
 const status = document.getElementById('status');
 const cacheName = 'offline-maps-v1';
 let map = L.map('map').setView([0, 0], 2);
 let currentLayer = null;
 let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
-let tempCoords = null;
 
-function logger(msg) {
+function logger(msg, type = "info") {
     const entry = document.createElement('div');
-    entry.textContent = `> ${msg}`;
+    const colors = { info: "#10b981", warn: "#f59e0b", error: "#ef4444", debug: "#3b82f6" };
+    entry.style.color = colors[type];
+    entry.textContent = `> [${type.toUpperCase()}] ${msg}`;
     logElement.appendChild(entry);
     logElement.scrollTop = logElement.scrollHeight;
 }
 
-// --- INTERCEPTEUR DE CACHE (Pour le débug) ---
-// Cette fonction permet de voir si Leaflet demande une URL que nous avons en cache
+// --- INTERCEPTEUR POUR VOIR CE QUE LEAFLET DEMANDE ---
 window.fetch = ((originalFetch) => {
     return async (...args) => {
         const url = args[0];
         if (url.includes('local-tiles')) {
             const cache = await caches.open(cacheName);
             const match = await cache.match(url);
+            const path = url.split('local-tiles/')[1];
             if (match) {
-                logger("✅ CHARGEMENT : " + url.split('local-tiles/')[1]);
+                logger(`OUI : ${path}`, "debug");
             } else {
-                logger("❌ INTROUVABLE : " + url.split('local-tiles/')[1]);
+                logger(`NON : ${path}`, "error");
             }
         }
         return originalFetch(...args);
     };
 })(window.fetch);
 
-// --- IMPORTATION ZIP (Version Finale Corrigée) ---
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    status.innerText = "Importation...";
+    status.innerText = "Analyse du ZIP...";
+    logger("Début import : " + file.name, "info");
     
     try {
         const zip = await JSZip.loadAsync(file);
-        
-        // 1. Suppression RADICALE du cache
         await caches.delete(cacheName);
         const newCache = await caches.open(cacheName);
         
         let count = 0;
-        const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+        const levelsFound = new Set();
 
         for (const [path, entry] of Object.entries(zip.files)) {
             if (entry.dir || path.includes('__MACOSX')) continue;
             
-            // On ne prend que les fichiers qui finissent par .png ou .jpg
             if (path.match(/\.(png|jpg|jpeg)$/i)) {
                 const segments = path.toLowerCase().split('/');
-                
-                // On cherche l'index du niveau (ex: n-1)
+                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
                 let lvlIndex = segments.findIndex(seg => levels.includes(seg));
 
                 if (lvlIndex !== -1) {
                     const levelName = segments[lvlIndex];
+                    levelsFound.add(levelName);
                     
-                    // EXTRACTION DES COORDONNÉES (Z/X/Y)
-                    // On filtre pour ne garder que les segments numériques + le fichier final
-                    const coords = segments.slice(lvlIndex + 1).filter(s => s.match(/^\d+$/) || s.includes('.png') || s.includes('.jpg'));
+                    // On extrait tout ce qui suit le niveau
+                    const afterLevel = segments.slice(lvlIndex + 1);
+                    // On ne garde que les chiffres pour Z, X, Y
+                    const coords = afterLevel.filter(s => s.match(/^\d+$/) || s.match(/^\d+\.(png|jpg|jpeg)$/));
                     
-                    // On ne garde que les 3 derniers (Z, X, Y)
-                    const zxy = coords.slice(-3); 
-                    
-                    if (zxy.length === 3) {
-                        const finalPath = `${levelName}/${zxy[0]}/${zxy[1]}/${zxy[2]}`;
+                    if (coords.length >= 3) {
+                        const z = coords[coords.length - 3];
+                        const x = coords[coords.length - 2];
+                        const y = coords[coords.length - 1].split('.')[0];
+                        
+                        const finalPath = `${levelName}/${z}/${x}/${y}.png`;
                         const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
                         
                         const blob = await entry.async('blob');
-                        
-                        // FORCER LE TYPE IMAGE (Crucial pour Leaflet)
-                        const imageResponse = new Response(blob, {
-                            headers: { 
-                                'Content-Type': 'image/png',
-                                'Content-Length': blob.size.toString()
-                            }
-                        });
-                        
-                        await newCache.put(virtualUrl, imageResponse);
-                        if (count === 0) logger("✅ PREMIER FIX : " + finalPath);
+                        await newCache.put(virtualUrl, new Response(blob, {
+                            headers: { 'Content-Type': 'image/png' }
+                        }));
                         count++;
+                    } else {
+                        if(count < 5) logger(`Structure ignorée : ${path}`, "warn");
                     }
                 }
             }
         }
-        status.innerText = `Succès : ${count} tuiles`;
-        logger(`SYSTÈME : Cache prêt (${count} images).`);
+        
+        logger(`Niveaux détectés : ${Array.from(levelsFound).join(', ')}`, "info");
+        logger(`Total mappé : ${count} tuiles`, "info");
+        status.innerText = `Prêt (${count} tuiles)`;
         updateMap();
-    } catch (err) { 
-        logger("ERREUR : " + err.message);
+        
+    } catch (err) {
+        logger("CRASH ZIP : " + err.message, "error");
     }
 });
 
@@ -171,20 +168,13 @@ function updateMap() {
     const level = document.getElementById('levelSelect').value.toLowerCase();
     if (currentLayer) map.removeLayer(currentLayer);
     
-    const tileUrl = window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png';
-    
-    logger("🗺️ NIVEAU : " + level);
+    logger(`Changement vue vers : ${level}`, "debug");
 
-    currentLayer = L.tileLayer(tileUrl, { 
-        maxZoom: 22, 
-        minZoom: 0, 
-        noWrap: true,
-        // Petite astuce si tes tuiles ne sont pas en 256x256
-        tileSize: 256 
+    currentLayer = L.tileLayer(window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png', {
+        maxZoom: 22,
+        minZoom: 0,
+        noWrap: true
     }).addTo(map);
-
-    // On se place au centre du plan (0,0) au zoom 2 pour voir si quelque chose apparaît
-    map.setView([0, 0], 2); 
 }
 
     function renderMarkers() {
