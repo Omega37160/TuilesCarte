@@ -117,19 +117,20 @@ function updateMap() {
     const level = document.getElementById('levelSelect').value;
     if (currentLayer) map.removeLayer(currentLayer);
     
-    const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-    // Ajout de .toLowerCase() pour éviter les erreurs de casse (RDC vs rdc)
-    const tileUrl = baseUrl + 'local-tiles/' + level.toLowerCase() + '/{z}/{x}/{y}.png';
+    // On construit l'URL absolue sans se soucier du dossier courant
+    const tileUrl = window.location.origin + '/local-tiles/' + level.toLowerCase() + '/{z}/{x}/{y}.png';
     
+    logger("Affichage niveau : " + level);
+
     currentLayer = L.tileLayer(tileUrl, { 
         maxZoom: 22, 
         minZoom: 0, 
         noWrap: true,
-        bounds: [[-90, -180], [90, 180]] // Aide Leaflet à délimiter la zone
+        continuousWorld: true // Important pour les cartes non-géographiques (plans)
     }).addTo(map);
 
-    // Recentrer la carte
-    map.setView([0, 0], 2);
+    // On force un zoom arrière pour essayer de voir le plan
+    map.setView([0, 0], 2); 
     renderMarkers();
 }
 
