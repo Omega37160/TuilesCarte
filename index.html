@@ -169,7 +169,7 @@ async function saveEquipment() {
             const extension = photoFile.name.split('.').pop();
             const photoLink = document.createElement('a');
             photoLink.href = URL.createObjectURL(photoFile);
-            photoLink.download = `${tag}_${level}.${extension}`;
+            photoLink.download = `${tag}.${extension}`;
             photoLink.click();
         }
 
@@ -182,9 +182,9 @@ async function saveEquipment() {
     }
 
 function generateCsvBlob() {
-    let csvContent = "\ufeffTag;Type;Niveau;Latitude;Longitude;Date\n"; // Ajout du BOM \ufeff
+    let csvContent = "\ufeffTag;Nom;Type;Niveau;Latitude;Longitude\n"; // Ajout du BOM \ufeff
     equipmentData.forEach(item => {
-        csvContent += `${item.tag};${item.type};${item.level};${item.lat};${item.lng};${item.date}\n`;
+        csvContent += `${item.tag};${item.tag};${item.type};${item.level};${item.lat};${item.lng}\n`;
     });
     return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 }
