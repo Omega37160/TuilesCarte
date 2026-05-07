@@ -285,121 +285,81 @@ function logger(msg, type = "info") {
 // IMPORT ZIP
 //////////////////////////////////////////////////////////
 
-document.getElementById('zipInput')
-
-.addEventListener('change', async (e) => {
-
+document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
-
     if (!file) return;
 
     status.innerText = "Analyse du ZIP...";
-
     logger("Début import : " + file.name);
 
     try {
-
         const zip = await JSZip.loadAsync(file);
-
         await caches.delete(cacheName);
-
         const newCache = await caches.open(cacheName);
 
         let count = 0;
-
         const levelsFound = new Set();
 
         for (const [path, entry] of Object.entries(zip.files)) {
-
-            if (entry.dir || path.includes('__MACOSX')) {
+            if (entry.dir || path.includes('__MACOSX') || !path.match(/\.(png|jpg|jpeg)$/i)) {
                 continue;
             }
 
-            if (!path.match(/\.(png|jpg|jpeg)$/i)) {
-                continue;
+            // Nouvelle logique pour ta structure
+            let cleanPath = path.replace(/^Tiles\//i, ''); // Enlève "Tiles/"
+            const segments = cleanPath.toLowerCase().split('/');
+
+            const levelMap = {
+                'n+1': 'n+1',
+                'n-1': 'n-1',
+                'n+2': 'n+2',
+                'rdc': 'rdc'
+            };
+
+            let levelName = null;
+            for (let seg of segments) {
+                if (levelMap[seg]) {
+                    levelName = levelMap[seg];
+                    break;
+                }
             }
 
-            const segments = path.toLowerCase().split('/');
-
-            const levels = ['rdc','n-1','n+1','n+2'];
-
-            let lvlIndex =
-                segments.findIndex(seg =>
-                    levels.includes(seg)
-                );
-
-            if (lvlIndex === -1) continue;
-
-            const levelName = segments[lvlIndex];
+            if (!levelName) continue;
 
             levelsFound.add(levelName);
 
-            const afterLevel =
-                segments.slice(lvlIndex + 1);
+            // Extraire z/x/y
+            const afterLevel = segments.slice(segments.indexOf(levelName.toLowerCase()) + 1);
+            const coords = afterLevel.filter(s => /^\d+$/.test(s) || s.match(/^\d+\.(png|jpg|jpeg)$/i));
 
-            const coords = afterLevel.filter(s =>
-                s.match(/^\d+$/) ||
-                s.match(/^\d+\.(png|jpg|jpeg)$/)
-            );
-
-            if (coords.length < 3) {
-
-                logger(`Structure ignorée : ${path}`, "warn");
-
-                continue;
-            }
+            if (coords.length < 3) continue;
 
             const z = coords[coords.length - 3];
-
             const x = coords[coords.length - 2];
+            const y = coords[coords.length - 1].split('.')[0];
 
-            const y =
-                coords[coords.length - 1]
-                .split('.')[0];
-
-            const finalPath =
-                `${levelName}/${z}/${x}/${y}.png`;
-
-            const virtualUrl =
-                window.location.origin +
-                '/local-tiles/' +
-                finalPath;
+            const finalPath = `${levelName}/${z}/${x}/${y}.png`;
+            const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
 
             const blob = await entry.async('blob');
-
             await newCache.put(
                 virtualUrl,
-                new Response(blob,{
-                    headers:{
-                        'Content-Type':'image/png'
-                    }
-                })
+                new Response(blob, { headers: { 'Content-Type': 'image/png' } })
             );
-
             count++;
         }
 
-        logger(
-            `Niveaux détectés : ${
-                Array.from(levelsFound).join(', ')
-            }`
-        );
-
+        logger(`Niveaux détectés : ${Array.from(levelsFound).join(', ')}`);
         logger(`Total mappé : ${count} tuiles`);
+        status.innerText = `Prêt (${count} tuiles)`;
 
-        status.innerText =
-            `Prêt (${count} tuiles)`;
-
+        // Auto-affichage du premier niveau
+        document.getElementById('levelSelect').value = Array.from(levelsFound)[0] || 'n-1';
         updateMap();
 
-    }
-
-    catch(err){
-
-        logger(
-            "CRASH ZIP : " + err.message,
-            "error"
-        );
+    } catch(err) {
+        logger("CRASH ZIP : " + err.message, "error");
+        console.error(err);
     }
 });
 
