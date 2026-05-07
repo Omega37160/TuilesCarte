@@ -3,295 +3,714 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>Carte Offline - Relevé Terrain</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
     <style>
-        :root { --primary: #3b82f6; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; }
-        header { padding: 10px; background: var(--card); text-align: center; font-weight: bold; border-bottom: 1px solid #334155; }
-        #controls { padding: 15px; display: flex; flex-direction: column; gap: 8px; background: var(--card); }
-        #map { flex: 1; width: 100%; background: #000; }
-        #debug-log { height: 80px; background: #000; color: #10b981; font-family: monospace; font-size: 10px; padding: 5px; overflow-y: auto; border-top: 1px solid #334155; white-space: pre-wrap; }
-        select, input { padding: 12px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: white; width: 100%; box-sizing: border-box; }
-        #status { font-size: 13px; color: #3b82f6; font-weight: bold; }
-        .action-buttons { display: flex; padding: 10px; gap: 10px; background: var(--card); }
-        button { cursor: pointer; font-weight: bold; border: none; border-radius: 5px; padding: 12px; }
+        :root{
+            --primary:#3b82f6;
+            --bg:#0f172a;
+            --card:#1e293b;
+            --text:#f8fafc;
+        }
+
+        body{
+            font-family:sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            margin:0;
+            display:flex;
+            flex-direction:column;
+            height:100vh;
+        }
+
+        header{
+            padding:10px;
+            background:var(--card);
+            text-align:center;
+            font-weight:bold;
+            border-bottom:1px solid #334155;
+        }
+
+        #controls{
+            padding:15px;
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+            background:var(--card);
+        }
+
+        #map{
+            flex:1;
+            width:100%;
+            background:#000;
+        }
+
+        #debug-log{
+            height:80px;
+            background:#000;
+            color:#10b981;
+            font-family:monospace;
+            font-size:10px;
+            padding:5px;
+            overflow-y:auto;
+            border-top:1px solid #334155;
+            white-space:pre-wrap;
+        }
+
+        select,
+        input{
+            padding:12px;
+            border-radius:5px;
+            border:1px solid #334155;
+            background:#0f172a;
+            color:white;
+            width:100%;
+            box-sizing:border-box;
+        }
+
+        #status{
+            font-size:13px;
+            color:#3b82f6;
+            font-weight:bold;
+        }
+
+        .action-buttons{
+            display:flex;
+            padding:10px;
+            gap:10px;
+            background:var(--card);
+        }
+
+        button{
+            cursor:pointer;
+            font-weight:bold;
+            border:none;
+            border-radius:5px;
+            padding:12px;
+        }
     </style>
 </head>
+
 <body>
 
 <header>CARTE OFFLINE 2</header>
 
 <div id="controls">
-    <div id="status">En attente de fichier ZIP...</div>
-    <input type="file" id="zipInput" accept=".zip">
+
+    <div id="status">
+        En attente de fichier ZIP...
+    </div>
+
+    <input type="file"
+           id="zipInput"
+           accept=".zip">
+
     <select id="levelSelect">
         <option value="rdc">RDC</option>
         <option value="n-1" selected>N-1</option>
         <option value="n+1">N+1</option>
         <option value="n+2">N+2</option>
     </select>
+
 </div>
 
 <div id="map"></div>
 
 <div class="action-buttons">
-    <button onclick="downloadCsv()" style="background: #3b82f6; color: white; flex: 1;">💾 Télécharger CSV</button>
-    <button onclick="sendCsvByEmail()" style="background: #10b981; color: white; flex: 1;">📧 Email</button>
-    <button onclick="clearCsv()" style="background: #ef4444; color: white; flex: 1;">🗑️ Vider</button>
+
+    <button onclick="downloadCsv()"
+            style="background:#3b82f6;color:white;flex:1;">
+        💾 Télécharger CSV
+    </button>
+
+    <button onclick="sendCsvByEmail()"
+            style="background:#10b981;color:white;flex:1;">
+        📧 Email
+    </button>
+
+    <button onclick="clearCsv()"
+            style="background:#ef4444;color:white;flex:1;">
+        🗑️ Vider
+    </button>
+
 </div>
 
-<div id="equipmentModal" style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 20px; z-index: 2000; border: 1px solid #334155; width: 85%; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+<div id="equipmentModal"
+     style="display:none;
+            position:fixed;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%);
+            background:var(--card);
+            padding:20px;
+            z-index:2000;
+            border:1px solid #334155;
+            width:85%;
+            border-radius:10px;
+            box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+
     <h3 style="margin-top:0;">Nouvel Équipement</h3>
+
     <label>Nom du Tag :</label>
-    <input type="text" id="tagName" placeholder="ex: PT-101" style="margin-bottom:10px;">
-    
+
+    <input type="text"
+           id="tagName"
+           placeholder="ex: PT-101"
+           style="margin-bottom:10px;">
+
     <label>Type :</label>
-    <select id="tagType" style="margin-bottom:10px;">
+
+    <select id="tagType"
+            style="margin-bottom:10px;">
+
         <option value="Instrumentation">Instrumentation</option>
         <option value="Moteur">Moteur</option>
         <option value="Armoire">Armoire</option>
         <option value="Autre">Autre</option>
+
     </select>
 
     <label>Photo :</label>
-    <input type="file" id="photoInput" accept="image/*" capture="environment" style="margin-bottom:10px;">
-    
-    <div style="margin-top: 15px; display: flex; gap: 10px;">
-        <button onclick="saveEquipment()" style="background: var(--primary); color: white; flex: 1;">Enregistrer</button>
-        <button onclick="closeModal()" style="background: #64748b; color: white; flex: 1;">Annuler</button>
+
+    <input type="file"
+           id="photoInput"
+           accept="image/*"
+           capture="environment"
+           style="margin-bottom:10px;">
+
+    <div style="margin-top:15px;display:flex;gap:10px;">
+
+        <button onclick="saveEquipment()"
+                style="background:var(--primary);color:white;flex:1;">
+            Enregistrer
+        </button>
+
+        <button onclick="closeModal()"
+                style="background:#64748b;color:white;flex:1;">
+            Annuler
+        </button>
+
     </div>
+
 </div>
 
-<div id="debug-log">--- Logs Système ---<br></div>
+<div id="debug-log">
+--- Logs Système ---
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
 
+//////////////////////////////////////////////////////////
+// SERVICE WORKER
+//////////////////////////////////////////////////////////
+
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
+
+    navigator.serviceWorker.register('./sw.js')
+
+    .then(() => {
         logger("Service Worker actif ✓", "info");
-    }).catch(err => {
+    })
+
+    .catch(err => {
         logger("Erreur SW : " + err.message, "error");
     });
 }
-    
+
+//////////////////////////////////////////////////////////
+// VARIABLES
+//////////////////////////////////////////////////////////
+
 const logElement = document.getElementById('debug-log');
+
 const status = document.getElementById('status');
+
 const cacheName = 'offline-maps-v1';
-let map = L.map('map').setView([0, 0], 2);
+
 let currentLayer = null;
-let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
+
+let tempCoords = null;
+
+let equipmentData =
+    JSON.parse(localStorage.getItem('equipments') || '[]');
+
+//////////////////////////////////////////////////////////
+// LEAFLET FIX IMPORTANT
+//////////////////////////////////////////////////////////
+
+let map = L.map('map', {
+
+    crs: L.CRS.Simple,
+    minZoom: 0,
+    maxZoom: 22,
+    zoomControl: true
+
+}).setView([0,0],0);
+
+//////////////////////////////////////////////////////////
+// LOGGER
+//////////////////////////////////////////////////////////
 
 function logger(msg, type = "info") {
+
     const entry = document.createElement('div');
-    const colors = { info: "#10b981", warn: "#f59e0b", error: "#ef4444", debug: "#3b82f6" };
+
+    const colors = {
+        info:"#10b981",
+        warn:"#f59e0b",
+        error:"#ef4444",
+        debug:"#3b82f6"
+    };
+
     entry.style.color = colors[type];
-    entry.textContent = `> [${type.toUpperCase()}] ${msg}`;
+
+    entry.textContent =
+        `> [${type.toUpperCase()}] ${msg}`;
+
     logElement.appendChild(entry);
-    logElement.scrollTop = logElement.scrollHeight;
+
+    logElement.scrollTop =
+        logElement.scrollHeight;
 }
 
-document.getElementById('zipInput').addEventListener('change', async (e) => {
+//////////////////////////////////////////////////////////
+// IMPORT ZIP
+//////////////////////////////////////////////////////////
+
+document.getElementById('zipInput')
+
+.addEventListener('change', async (e) => {
+
     const file = e.target.files[0];
+
     if (!file) return;
+
     status.innerText = "Analyse du ZIP...";
-    logger("Début import : " + file.name, "info");
-    
+
+    logger("Début import : " + file.name);
+
     try {
+
         const zip = await JSZip.loadAsync(file);
+
         await caches.delete(cacheName);
+
         const newCache = await caches.open(cacheName);
-        
+
         let count = 0;
+
         const levelsFound = new Set();
 
         for (const [path, entry] of Object.entries(zip.files)) {
-            if (entry.dir || path.includes('__MACOSX')) continue;
-            
-            if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                const segments = path.toLowerCase().split('/');
-                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
-                let lvlIndex = segments.findIndex(seg => levels.includes(seg));
 
-                if (lvlIndex !== -1) {
-                    const levelName = segments[lvlIndex];
-                    levelsFound.add(levelName);
-                    
-                    // On extrait tout ce qui suit le niveau
-                    const afterLevel = segments.slice(lvlIndex + 1);
-                    // On ne garde que les chiffres pour Z, X, Y
-                    const coords = afterLevel.filter(s => s.match(/^\d+$/) || s.match(/^\d+\.(png|jpg|jpeg)$/));
-                    
-                    if (coords.length >= 3) {
-                        const z = coords[coords.length - 3];
-                        const x = coords[coords.length - 2];
-                        const y = coords[coords.length - 1].split('.')[0];
-                        
-                        const finalPath = `${levelName}/${z}/${x}/${y}.png`;
-                        const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
-                        
-                        const blob = await entry.async('blob');
-                        await newCache.put(virtualUrl, new Response(blob, {
-                            headers: { 'Content-Type': 'image/png' }
-                        }));
-                        count++;
-                    } else {
-                        if(count < 5) logger(`Structure ignorée : ${path}`, "warn");
-                    }
-                }
+            if (entry.dir || path.includes('__MACOSX')) {
+                continue;
             }
+
+            if (!path.match(/\.(png|jpg|jpeg)$/i)) {
+                continue;
+            }
+
+            const segments = path.toLowerCase().split('/');
+
+            const levels = ['rdc','n-1','n+1','n+2'];
+
+            let lvlIndex =
+                segments.findIndex(seg =>
+                    levels.includes(seg)
+                );
+
+            if (lvlIndex === -1) continue;
+
+            const levelName = segments[lvlIndex];
+
+            levelsFound.add(levelName);
+
+            const afterLevel =
+                segments.slice(lvlIndex + 1);
+
+            const coords = afterLevel.filter(s =>
+                s.match(/^\d+$/) ||
+                s.match(/^\d+\.(png|jpg|jpeg)$/)
+            );
+
+            if (coords.length < 3) {
+
+                logger(`Structure ignorée : ${path}`, "warn");
+
+                continue;
+            }
+
+            const z = coords[coords.length - 3];
+
+            const x = coords[coords.length - 2];
+
+            const y =
+                coords[coords.length - 1]
+                .split('.')[0];
+
+            const finalPath =
+                `${levelName}/${z}/${x}/${y}.png`;
+
+            const virtualUrl =
+                window.location.origin +
+                '/local-tiles/' +
+                finalPath;
+
+            const blob = await entry.async('blob');
+
+            await newCache.put(
+                virtualUrl,
+                new Response(blob,{
+                    headers:{
+                        'Content-Type':'image/png'
+                    }
+                })
+            );
+
+            count++;
         }
-        
-        logger(`Niveaux détectés : ${Array.from(levelsFound).join(', ')}`, "info");
-        logger(`Total mappé : ${count} tuiles`, "info");
-        status.innerText = `Prêt (${count} tuiles)`;
+
+        logger(
+            `Niveaux détectés : ${
+                Array.from(levelsFound).join(', ')
+            }`
+        );
+
+        logger(`Total mappé : ${count} tuiles`);
+
+        status.innerText =
+            `Prêt (${count} tuiles)`;
+
         updateMap();
-        
-    } catch (err) {
-        logger("CRASH ZIP : " + err.message, "error");
+
+    }
+
+    catch(err){
+
+        logger(
+            "CRASH ZIP : " + err.message,
+            "error"
+        );
     }
 });
 
+//////////////////////////////////////////////////////////
+// UPDATE MAP
+//////////////////////////////////////////////////////////
+
 async function updateMap() {
-    const level = document.getElementById('levelSelect').value.toLowerCase();
-    if (currentLayer) map.removeLayer(currentLayer);
-    
-    logger(`--- Tentative d'affichage : ${level} ---`, "info");
 
-    // 1. Chercher une tuile de ce niveau dans le cache pour se localiser
-    const cache = await caches.open(cacheName);
-    const keys = await cache.keys();
-    const match = keys.find(k => k.url.includes(`/local-tiles/${level}/`));
+    const level =
+        document.getElementById('levelSelect')
+        .value
+        .toLowerCase();
 
-    if (match) {
-        // On extrait Z, X, Y de l'URL trouvée (ex: .../n-1/18/123/456.png)
-        const parts = match.url.split('/');
-        const z = parseInt(parts[parts.length - 3]);
-        const x = parseInt(parts[parts.length - 2]);
-        const y = parseInt(parts[parts.length - 1]);
+    if (currentLayer) {
 
-        logger(`🎯 Tuile trouvée ! Saut vers Zoom ${z}`, "info");
-        
-        // On configure la couche
-        currentLayer = L.tileLayer(window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png', {
-            maxZoom: 22,
-            minZoom: 0,
-            noWrap: true
-        }).addTo(map);
-
-        // On force la vue sur la tuile existante pour éviter l'écran noir
-        // Pour les plans non-géo, on utilise une conversion simple ou on centre
-        map.setView(map.unproject(L.point(x * 256, y * 256), z), z);
-
-    } else {
-        logger(`❌ AUCUNE tuile en cache pour le niveau : ${level}`, "error");
-        logger(`Astuce : Vérifie que ton ZIP contient bien un dossier "${level}"`, "warn");
+        map.removeLayer(currentLayer);
     }
-    
+
+    logger(
+        `--- Tentative d'affichage : ${level} ---`
+    );
+
+    const cache = await caches.open(cacheName);
+
+    const keys = await cache.keys();
+
+    const match = keys.find(k =>
+        k.url.includes(`/local-tiles/${level}/`)
+    );
+
+    if (!match) {
+
+        logger(
+            `❌ Aucune tuile trouvée pour ${level}`,
+            "error"
+        );
+
+        return;
+    }
+
+    const parts = match.url.split('/');
+
+    const z =
+        parseInt(parts[parts.length - 3]);
+
+    const x =
+        parseInt(parts[parts.length - 2]);
+
+    const y =
+        parseInt(
+            parts[parts.length - 1]
+            .split('.')[0]
+        );
+
+    logger(
+        `🎯 Tuile trouvée : Z=${z} X=${x} Y=${y}`
+    );
+
+    currentLayer = L.tileLayer(
+
+        window.location.origin +
+        `/local-tiles/${level}/{z}/{x}/{y}.png`,
+
+        {
+            tileSize:256,
+            minZoom:0,
+            maxZoom:22,
+            noWrap:true,
+            bounds:[[0,0],[8192,8192]]
+        }
+
+    ).addTo(map);
+
+    const point =
+        L.point(x * 256, y * 256);
+
+    const latlng =
+        map.unproject(point, z);
+
+    map.setView(latlng, z);
+
     renderMarkers();
 }
 
-    function renderMarkers() {
-        equipmentData.forEach(item => {
-            L.circleMarker([item.lat, item.lng], { color: 'yellow', radius: 6 })
-             .addTo(map)
-             .bindPopup(`<b>${item.tag}</b><br>Niveau: ${item.level}`);
-        });
-    }
+//////////////////////////////////////////////////////////
+// RENDER MARKERS
+//////////////////////////////////////////////////////////
 
-    document.getElementById('levelSelect').addEventListener('change', updateMap);
+function renderMarkers() {
 
-    map.on('click', (e) => {
-        tempCoords = e.latlng;
-        document.getElementById('equipmentModal').style.display = 'block';
-    });
-
-    function closeModal() {
-        document.getElementById('equipmentModal').style.display = 'none';
-        document.getElementById('tagName').value = '';
-        document.getElementById('photoInput').value = '';
-    }
-
-async function saveEquipment() {
-        const tag = document.getElementById('tagName').value;
-        const type = document.getElementById('tagType').value;
-        const level = document.getElementById('levelSelect').value.toUpperCase();
-        const photoFile = document.getElementById('photoInput').files[0];
-
-        if (!tag) { alert("Le nom du Tag est obligatoire"); return; }
-
-        const newItem = {
-            tag, type, level,
-            lat: tempCoords.lat.toFixed(6),
-            lng: tempCoords.lng.toFixed(6),
-            date: new Date().toLocaleString()
-        };
-        equipmentData.push(newItem);
-        localStorage.setItem('equipments', JSON.stringify(equipmentData));
-
-        L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
-         .bindPopup(`<b>${tag}</b> [${level}]<br>${type}`).openPopup();
-
-        // 1. TELECHARGEMENT DE LA PHOTO
-        if (photoFile) {
-            const extension = photoFile.name.split('.').pop();
-            const photoLink = document.createElement('a');
-            photoLink.href = URL.createObjectURL(photoFile);
-            photoLink.download = `${tag}.${extension}`;
-            photoLink.click();
-        }
-
-        // 2. TELECHARGEMENT AUTOMATIQUE DU CSV (Optionnel à chaque ajout)
-        // Si tu veux qu'il se télécharge à chaque fois, décommente la ligne suivante :
-        // downloadCsv(); 
-
-        logger(`Enregistré : ${tag} (${level})`);
-        closeModal();
-    }
-
-function generateCsvBlob() {
-    let csvContent = "\ufeffTag;Nom;Type;Niveau;Latitude;Longitude\n"; // Ajout du BOM \ufeff
     equipmentData.forEach(item => {
-        csvContent += `${item.tag};${item.tag};${item.type};${item.level};${item.lat};${item.lng}\n`;
+
+        L.circleMarker(
+            [item.lat, item.lng],
+            {
+                color:'yellow',
+                radius:6
+            }
+        )
+
+        .addTo(map)
+
+        .bindPopup(
+            `<b>${item.tag}</b><br>
+             Niveau: ${item.level}`
+        );
     });
-    return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 }
 
-    function downloadCsv() {
-        if (equipmentData.length === 0) { alert("Aucune donnée !"); return; }
-        const blob = generateCsvBlob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `releve_terrain_${new Date().getTime()}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        logger("Fichier CSV téléchargé.");
+//////////////////////////////////////////////////////////
+// CHANGE LEVEL
+//////////////////////////////////////////////////////////
+
+document.getElementById('levelSelect')
+.addEventListener('change', updateMap);
+
+//////////////////////////////////////////////////////////
+// CLICK MAP
+//////////////////////////////////////////////////////////
+
+map.on('click', (e) => {
+
+    tempCoords = e.latlng;
+
+    document.getElementById(
+        'equipmentModal'
+    ).style.display = 'block';
+});
+
+//////////////////////////////////////////////////////////
+// CLOSE MODAL
+//////////////////////////////////////////////////////////
+
+function closeModal() {
+
+    document.getElementById(
+        'equipmentModal'
+    ).style.display = 'none';
+
+    document.getElementById(
+        'tagName'
+    ).value = '';
+
+    document.getElementById(
+        'photoInput'
+    ).value = '';
+}
+
+//////////////////////////////////////////////////////////
+// SAVE EQUIPMENT
+//////////////////////////////////////////////////////////
+
+async function saveEquipment() {
+
+    const tag =
+        document.getElementById('tagName').value;
+
+    const type =
+        document.getElementById('tagType').value;
+
+    const level =
+        document.getElementById('levelSelect')
+        .value
+        .toUpperCase();
+
+    if (!tag) {
+
+        alert("Le nom du Tag est obligatoire");
+
+        return;
     }
 
-    function sendCsvByEmail() {
-        if (equipmentData.length === 0) { alert("Le CSV est vide !"); return; }
-        // On télécharge d'abord le CSV pour sécurité
-        downloadCsv();
-        // Puis on ouvre le mail
-        setTimeout(() => {
-            window.location.href = `mailto:?subject=Relevé Terrain&body=Veuillez trouver ci-joint le relevé de ${equipmentData.length} équipements.`;
-        }, 500);
+    const newItem = {
+
+        tag,
+        type,
+        level,
+
+        lat: tempCoords.lat.toFixed(6),
+
+        lng: tempCoords.lng.toFixed(6),
+
+        date: new Date().toLocaleString()
+    };
+
+    equipmentData.push(newItem);
+
+    localStorage.setItem(
+        'equipments',
+        JSON.stringify(equipmentData)
+    );
+
+    L.circleMarker(tempCoords,{
+
+        color:'yellow',
+        radius:8
+
+    })
+
+    .addTo(map)
+
+    .bindPopup(
+        `<b>${tag}</b> [${level}]<br>${type}`
+    )
+
+    .openPopup();
+
+    logger(`Enregistré : ${tag}`);
+
+    closeModal();
+}
+
+//////////////////////////////////////////////////////////
+// CSV
+//////////////////////////////////////////////////////////
+
+function generateCsvBlob() {
+
+    let csvContent =
+        "\ufeffTag;Nom;Type;Niveau;Latitude;Longitude\n";
+
+    equipmentData.forEach(item => {
+
+        csvContent +=
+            `${item.tag};${item.tag};${item.type};${item.level};${item.lat};${item.lng}\n`;
+    });
+
+    return new Blob(
+        [csvContent],
+        {type:'text/csv;charset=utf-8;'}
+    );
+}
+
+function downloadCsv() {
+
+    if (equipmentData.length === 0) {
+
+        alert("Aucune donnée !");
+
+        return;
     }
 
-    function clearCsv() {
-        if (confirm("Voulez-vous vraiment vider tous les équipements ?")) {
-            equipmentData = [];
-            localStorage.removeItem('equipments');
-            location.reload();
-        }
+    const blob = generateCsvBlob();
+
+    const url =
+        URL.createObjectURL(blob);
+
+    const link =
+        document.createElement('a');
+
+    link.href = url;
+
+    link.download =
+        `releve_terrain_${Date.now()}.csv`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+
+    logger("CSV téléchargé");
+}
+
+function sendCsvByEmail() {
+
+    if (equipmentData.length === 0) {
+
+        alert("Le CSV est vide !");
+
+        return;
     }
-    
-    window.onload = renderMarkers;
+
+    downloadCsv();
+
+    setTimeout(() => {
+
+        window.location.href =
+            `mailto:?subject=Relevé Terrain&body=Veuillez trouver ci-joint le relevé de ${equipmentData.length} équipements.`;
+
+    },500);
+}
+
+//////////////////////////////////////////////////////////
+// CLEAR
+//////////////////////////////////////////////////////////
+
+function clearCsv() {
+
+    if (
+        confirm(
+            "Voulez-vous vraiment vider tous les équipements ?"
+        )
+    ) {
+
+        equipmentData = [];
+
+        localStorage.removeItem('equipments');
+
+        location.reload();
+    }
+}
+
+//////////////////////////////////////////////////////////
+// START
+//////////////////////////////////////////////////////////
+
+window.onload = renderMarkers;
+
 </script>
+
 </body>
 </html>
