@@ -181,13 +181,13 @@ async function saveEquipment() {
         closeModal();
     }
 
-    function generateCsvBlob() {
-        let csvContent = "Tag;Type;Niveau;Latitude;Longitude;Date\n";
-        equipmentData.forEach(item => {
-            csvContent += `${item.tag};${item.type};${item.level};${item.lat};${item.lng};${item.date}\n`;
-        });
-        return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    }
+function generateCsvBlob() {
+    let csvContent = "\ufeffTag;Type;Niveau;Latitude;Longitude;Date\n"; // Ajout du BOM \ufeff
+    equipmentData.forEach(item => {
+        csvContent += `${item.tag};${item.type};${item.level};${item.lat};${item.lng};${item.date}\n`;
+    });
+    return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+}
 
     function downloadCsv() {
         if (equipmentData.length === 0) { alert("Aucune donnée !"); return; }
