@@ -102,47 +102,56 @@ window.fetch = ((originalFetch) => {
     };
 })(window.fetch);
 
-// --- IMPORTATION ZIP (Version corrigée pour structure profonde) ---
+// --- IMPORTATION ZIP (Version Finale Corrigée) ---
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     status.innerText = "Importation...";
+    
     try {
         const zip = await JSZip.loadAsync(file);
-        const cache = await caches.open(cacheName);
+        // 1. Nettoyage TOTAL du cache pour éviter les résidus
         await caches.delete(cacheName);
         const newCache = await caches.open(cacheName);
         
         let count = 0;
+        const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
+
         for (const [path, entry] of Object.entries(zip.files)) {
             if (entry.dir || path.includes('__MACOSX')) continue;
             
             if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                const blob = await entry.async('blob');
                 const segments = path.toLowerCase().split('/');
-                
-                // On cherche l'index du niveau (rdc, n-1, etc.)
-                const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
                 let lvlIndex = segments.findIndex(seg => levels.includes(seg));
 
                 if (lvlIndex !== -1) {
-                    // ON RÉCUPÈRE UNIQUEMENT LES 3 DERNIERS SEGMENTS (z, x, y)
-                    // Cela permet de supprimer les dossiers intermédiaires inutiles
-                    const zxy = segments.slice(-3); // Prend [z, x, y.png]
+                    // On extrait le niveau et les 3 derniers chiffres (Z, X, Y)
                     const levelName = segments[lvlIndex];
+                    const zxy = segments.slice(-3); // Prend les 3 derniers : [z, x, y.png]
                     
                     const finalPath = `${levelName}/${zxy.join('/')}`;
                     const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
                     
-                    await newCache.put(virtualUrl, new Response(blob));
-                    if (count === 0) logger("📦 STOCKÉ COMME : " + finalPath);
+                    // 2. On récupère le blob et on FORCE le Content-Type en image/png
+                    const blob = await entry.async('blob');
+                    const imageResponse = new Response(blob, {
+                        headers: { 'Content-Type': 'image/png' }
+                    });
+                    
+                    await newCache.put(virtualUrl, imageResponse);
+                    
+                    if (count === 0) logger("✅ STOCKÉ : " + finalPath);
                     count++;
                 }
             }
         }
         status.innerText = `Succès : ${count} tuiles`;
+        logger(`SYSTÈME : ${count} fichiers prêts.`);
         updateMap();
-    } catch (err) { logger("ERREUR ZIP : " + err.message); }
+    } catch (err) { 
+        logger("ERREUR ZIP : " + err.message); 
+        console.error(err);
+    }
 });
 
 function updateMap() {
