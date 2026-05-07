@@ -6,252 +6,147 @@
     <title>Carte Offline N-1</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { 
-            --primary: #3b82f6; 
-            --success: #10b981;
-            --danger: #ef4444;
-            --bg: #0f172a; 
-            --card: #1e293b; 
-            --text: #f8fafc; 
-            --border: #334155;
-        }
-        
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        header { padding: 10px; background: var(--card); text-align: center; font-weight: bold; border-bottom: 1px solid var(--border); }
-        
-        #controls { padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--card); }
-        .row { display: flex; gap: 8px; width: 100%; }
-        
+        :root { --primary: #3b82f6; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { padding: 10px; background: var(--card); text-align: center; font-weight: bold; }
+        #controls { padding: 15px; display: flex; flex-direction: column; gap: 8px; background: var(--card); }
         #map { flex: 1; width: 100%; background: #000; }
-        
-        #debug-log { height: 80px; background: #000; color: #10b981; font-family: monospace; font-size: 10px; padding: 5px; overflow-y: auto; border-top: 1px solid var(--border); white-space: pre-wrap; }
-        
-        select, input, button { padding: 10px; border-radius: 5px; border: 1px solid var(--border); background: #0f172a; color: white; font-size: 14px; }
-        input[type="file"] { font-size: 12px; }
-        button { cursor: pointer; border: none; font-weight: bold; flex: 1; }
-        
-        #status { font-size: 12px; color: var(--primary); font-weight: bold; margin-bottom: 2px; }
-
-        /* Modal */
-        #equipmentModal { 
-            display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: var(--card); padding: 20px; z-index: 2000; border: 1px solid var(--border); 
-            width: 85%; max-width: 400px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        }
-        #equipmentModal h3 { margin-top: 0; }
-        #equipmentModal input, #equipmentModal select { margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        #debug-log { height: 100px; background: #000; color: #10b981; font-family: monospace; font-size: 10px; padding: 5px; overflow-y: auto; border-top: 1px solid #334155; white-space: pre-wrap; }
+        select, input { padding: 10px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: white; width: 100%; }
+        #status { font-size: 13px; color: #3b82f6; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<header>CARTE TECHNIQUE OFFLINE</header>
+<header>CARTE OFFLINE</header>
 
 <div id="controls">
-    <div id="status">Statut : En attente de fichier ZIP...</div>
-    
-    <div class="row">
-        <input type="file" id="zipInput" accept=".zip" style="flex: 2;">
-        <select id="levelSelect" style="flex: 1;">
-            <option value="rdc">RDC</option>
-            <option value="n-1" selected>N-1</option>
-            <option value="n+1">N+1</option>
-            <option value="n+2">N+2</option>
-        </select>
-    </div>
-
-    <div class="row">
-        <button onclick="sendCsvByEmail()" style="background: var(--success);">📧 Envoyer CSV</button>
-        <button onclick="clearCsv()" style="background: var(--danger);">🗑️ Vider</button>
-    </div>
+    <div id="status">En attente de fichier ZIP...</div>
+    <input type="file" id="zipInput" accept=".zip">
+    <select id="levelSelect">
+        <option value="rdc">RDC</option>
+        <option value="n-1" selected>N-1</option> <!-- Sélectionné par défaut -->
+        <option value="n+1">N+1</option>
+        <option value="n+2">N+2</option>
+    </select>
 </div>
 
 <div id="map"></div>
-
-<div id="debug-log">--- Logs Système ---<br></div>
+<!-- Boutons d'action -->
+<div id="controls" style="flex-direction: row; justify-content: space-between;">
+    <button onclick="sendCsvByEmail()" style="background: #10b981; color: white; padding: 10px; border: none; border-radius: 5px; flex: 1; margin-right: 5px;">📧 Envoyer CSV</button>
+    <button onclick="clearCsv()" style="background: #ef4444; color: white; padding: 10px; border: none; border-radius: 5px; flex: 1;">🗑️ Vider Liste</button>
+</div>
 
 <!-- Modal de saisie -->
-<div id="equipmentModal">
+<div id="equipmentModal" style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); padding: 20px; z-index: 2000; border: 1px solid #334155; width: 80%; border-radius: 10px;">
     <h3>Nouvel Équipement</h3>
     <input type="text" id="tagName" placeholder="Nom du Tag (ex: PT-101)">
-    <select id="tagType">
+    <select id="tagType" style="margin-top: 10px;">
         <option value="Instrumentation">Instrumentation</option>
         <option value="Moteur">Moteur</option>
         <option value="Armoire">Armoire</option>
     </select>
-    <label style="font-size: 12px; display: block; margin-bottom: 5px;">Photo (Optionnel) :</label>
-    <input type="file" id="photoInput" accept="image/*" capture="environment">
-    
-    <div class="row" style="margin-top: 10px;">
-        <button onclick="saveEquipment()" style="background: var(--primary);">Enregistrer</button>
-        <button onclick="closeModal()" style="background: #64748b;">Annuler</button>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="margin-top: 10px;">
+    <div style="margin-top: 15px; display: flex; gap: 10px;">
+        <button onclick="saveEquipment()" style="background: var(--primary); color: white; border: none; padding: 10px; flex: 1;">Enregistrer</button>
+        <button onclick="closeModal()" style="background: #64748b; color: white; border: none; padding: 10px; flex: 1;">Annuler</button>
     </div>
 </div>
+<div id="debug-log">--- Logs Système ---<br></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+@@ -147,6 +168,93 @@
+        logger(`Clic : ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+    });
 
-<script>
-    // --- CONFIGURATION & GLOBALES ---
-    const logElement = document.getElementById('debug-log');
-    const status = document.getElementById('status');
-    const cacheName = 'offline-maps-v1';
-    
-    let map = L.map('map').setView([0, 0], 5);
-    let currentLayer = null;
-    let tempCoords = null;
     let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
+let tempCoords = null;
 
-    function logger(msg) {
-        const entry = document.createElement('div');
-        entry.textContent = `> ${msg}`;
-        logElement.appendChild(entry);
-        logElement.scrollTop = logElement.scrollHeight;
-    }
+// Remplacer l'événement de clic existant
+map.on('click', (e) => {
+    tempCoords = e.latlng;
+    document.getElementById('equipmentModal').style.display = 'block';
+});
 
-    // --- INITIALISATION SW ---
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-            .then(() => logger("Service Worker : ✅ Enregistré"))
-            .catch(err => logger("Service Worker : ❌ Erreur : " + err));
-    }
+function closeModal() {
+    document.getElementById('equipmentModal').style.display = 'none';
+    document.getElementById('tagName').value = '';
+}
 
-    // --- GESTION DES TUILES (ZIP & CACHE) ---
-    document.getElementById('zipInput').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+async function saveEquipment() {
+    const tag = document.getElementById('tagName').value;
+    const type = document.getElementById('tagType').value;
+    const photoFile = document.getElementById('photoInput').files[0];
 
-        status.innerText = "Statut : Importation en cours...";
-        try {
-            const zip = await JSZip.loadAsync(file);
-            const cache = await caches.open(cacheName);
-            let count = 0;
+    if (!tag) { alert("Le nom du Tag est obligatoire"); return; }
 
-            for (const [path, entry] of Object.entries(zip.files)) {
-                if (entry.dir || path.includes('__MACOSX')) continue;
-
-                if (path.match(/\.(png|jpg|jpeg)$/i)) {
-                    const blob = await entry.async('blob');
-                    const segments = path.toLowerCase().split('/');
-                    const levels = ['rdc', 'n-1', 'n+1', 'n+2'];
-                    let startIndex = segments.findIndex(seg => levels.includes(seg));
-                    
-                    if (startIndex !== -1) {
-                        let finalPath = segments.slice(startIndex).join('/');
-                        const virtualUrl = window.location.origin + window.location.pathname.replace('index.html', '') + 'local-tiles/' + finalPath;
-                        await cache.put(virtualUrl, new Response(blob));
-                        count++;
-                    }
-                }
-            }
-            status.innerText = `Statut : ${count} tuiles chargées`;
-            logger(`Import terminé (${count} images).`);
-            updateMap();
-        } catch (err) {
-            logger("ERREUR ZIP : " + err.message);
-            status.innerText = "Statut : Erreur import";
-        }
-    });
-
-    function updateMap() {
-        const level = document.getElementById('levelSelect').value;
-        if (currentLayer) map.removeLayer(currentLayer);
-
-        const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
-        const tileUrl = baseUrl + 'local-tiles/' + level + '/{z}/{x}/{y}.png';
+    // 1. Gestion de la photo
+    if (photoFile) {
+        const extension = photoFile.name.split('.').pop();
+        const newFileName = `${tag}.${extension}`;
         
-        currentLayer = L.tileLayer(tileUrl, {
-            maxZoom: 22,
-            minZoom: 0,
-            noWrap: true,
-            bounds: [[-90, -180], [90, 180]]
-        }).addTo(map);
-
-        logger("Affichage niveau : " + level);
+        // Téléchargement automatique de l'image renommée sur le téléphone
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(photoFile);
+        link.download = newFileName;
+        link.click();
+        logger(`Photo enregistrée : ${newFileName}`);
     }
 
-    // --- GESTION DES EQUIPEMENTS ---
-    map.on('click', (e) => {
-        tempCoords = e.latlng;
-        document.getElementById('equipmentModal').style.display = 'block';
+    // 2. Enregistrement des données
+    const newItem = {
+        tag,
+        type,
+        lat: tempCoords.lat.toFixed(6),
+        lng: tempCoords.lng.toFixed(6),
+        date: new Date().toLocaleString()
+    };
+
+    equipmentData.push(newItem);
+    localStorage.setItem('equipments', JSON.stringify(equipmentData));
+
+    // 3. Ajout visuel sur la carte
+    L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
+     .bindPopup(`<b>${tag}</b><br>${type}`).openPopup();
+
+    logger(`Équipement ${tag} ajouté au CSV local.`);
+    closeModal();
+}
+
+function sendCsvByEmail() {
+    if (equipmentData.length === 0) { alert("Le CSV est vide !"); return; }
+
+    let csvContent = "Tag;Type;Latitude;Longitude;Date\n";
+    equipmentData.forEach(item => {
+        csvContent += `${item.tag};${item.type};${item.lat};${item.lng};${item.date}\n`;
     });
 
-    function closeModal() {
-        document.getElementById('equipmentModal').style.display = 'none';
-        document.getElementById('tagName').value = '';
-        document.getElementById('photoInput').value = '';
-    }
-
-    async function saveEquipment() {
-        const tag = document.getElementById('tagName').value;
-        const type = document.getElementById('tagType').value;
-        const photoFile = document.getElementById('photoInput').files[0];
-
-        if (!tag) { alert("Le nom du Tag est obligatoire"); return; }
-
-        if (photoFile) {
-            const extension = photoFile.name.split('.').pop();
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(photoFile);
-            link.download = `${tag}.${extension}`;
-            link.click();
-        }
-
-        const newItem = {
-            tag, type,
-            lat: tempCoords.lat.toFixed(6),
-            lng: tempCoords.lng.toFixed(6),
-            date: new Date().toLocaleString()
-        };
-
-        equipmentData.push(newItem);
-        localStorage.setItem('equipments', JSON.stringify(equipmentData));
-
-        L.circleMarker(tempCoords, { color: 'yellow', radius: 8 }).addTo(map)
-         .bindPopup(`<b>${tag}</b><br>${type}`).openPopup();
-
-        logger(`Équipement ${tag} enregistré.`);
-        closeModal();
-    }
-
-    // --- ACTIONS EXPORT ---
-    function sendCsvByEmail() {
-        if (equipmentData.length === 0) { alert("Aucune donnée à exporter"); return; }
-
-        let csvContent = "Tag;Type;Latitude;Longitude;Date\n";
-        equipmentData.forEach(item => {
-            csvContent += `${item.tag};${item.type};${item.lat};${item.lng};${item.date}\n`;
-        });
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = "releve_terrain.csv";
-        link.click();
-
-        setTimeout(() => {
-            window.location.href = `mailto:?subject=Relevé Terrain&body=Export de ${equipmentData.length} équipements effectué.`;
-        }, 1000);
-    }
-
-    function clearCsv() {
-        if (confirm("Supprimer définitivement toutes les données locales ?")) {
-            equipmentData = [];
-            localStorage.removeItem('equipments');
-            location.reload();
-        }
-    }
-
-    // --- EVENT LISTENERS ---
-    document.getElementById('levelSelect').addEventListener('change', updateMap);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     
-    // Charger les marqueurs existants au démarrage
-    window.onload = () => {
-        equipmentData.forEach(item => {
-            L.circleMarker([item.lat, item.lng], { color: 'orange', radius: 6 }).addTo(map)
-             .bindPopup(`<b>${item.tag}</b><br>${item.type}`);
-        });
-    };
+    // Création du lien de mail avec le corps du texte (le CSV est attaché manuellement par l'utilisateur ou copié)
+    // Note : On ne peut pas "attacher" automatiquement un fichier via un lien mailto: 
+    // On propose donc le téléchargement du CSV puis l'ouverture du mail.
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "releve_equipements.csv";
+    link.click();
+
+    setTimeout(() => {
+        window.location.href = `mailto:?subject=Relevé Terrain&body=Veuillez trouver ci-joint le relevé des ${equipmentData.length} équipements.`;
+    }, 1000);
+}
+
+function clearCsv() {
+    if (confirm("Voulez-vous vraiment vider tous les équipements enregistrés ?")) {
+        equipmentData = [];
+        localStorage.removeItem('equipments');
+        logger("Données CSV vidées.");
+        location.reload(); // Pour rafraîchir la carte
+    }
+}
+
 </script>
 </body>
 </html>
