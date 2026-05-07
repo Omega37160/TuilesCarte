@@ -164,17 +164,43 @@ document.getElementById('zipInput').addEventListener('change', async (e) => {
     }
 });
 
-function updateMap() {
+async function updateMap() {
     const level = document.getElementById('levelSelect').value.toLowerCase();
     if (currentLayer) map.removeLayer(currentLayer);
     
-    logger(`Changement vue vers : ${level}`, "debug");
+    logger(`--- Tentative d'affichage : ${level} ---`, "info");
 
-    currentLayer = L.tileLayer(window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png', {
-        maxZoom: 22,
-        minZoom: 0,
-        noWrap: true
-    }).addTo(map);
+    // 1. Chercher une tuile de ce niveau dans le cache pour se localiser
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    const match = keys.find(k => k.url.includes(`/local-tiles/${level}/`));
+
+    if (match) {
+        // On extrait Z, X, Y de l'URL trouvée (ex: .../n-1/18/123/456.png)
+        const parts = match.url.split('/');
+        const z = parseInt(parts[parts.length - 3]);
+        const x = parseInt(parts[parts.length - 2]);
+        const y = parseInt(parts[parts.length - 1]);
+
+        logger(`🎯 Tuile trouvée ! Saut vers Zoom ${z}`, "info");
+        
+        // On configure la couche
+        currentLayer = L.tileLayer(window.location.origin + '/local-tiles/' + level + '/{z}/{x}/{y}.png', {
+            maxZoom: 22,
+            minZoom: 0,
+            noWrap: true
+        }).addTo(map);
+
+        // On force la vue sur la tuile existante pour éviter l'écran noir
+        // Pour les plans non-géo, on utilise une conversion simple ou on centre
+        map.setView(map.unproject(L.point(x * 256, y * 256), z), z);
+
+    } else {
+        logger(`❌ AUCUNE tuile en cache pour le niveau : ${level}`, "error");
+        logger(`Astuce : Vérifie que ton ZIP contient bien un dossier "${level}"`, "warn");
+    }
+    
+    renderMarkers();
 }
 
     function renderMarkers() {
