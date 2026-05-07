@@ -375,7 +375,7 @@ async function updateMap() {
     logger(`--- Chargement niveau : ${level} ---`);
 
     // 1. On utilise le chemin relatif correct
-    const tileUrl = `local-tiles/${level}/{z}/{x}/{y}.png`;
+    const tileUrl = window.location.origin + `/local-tiles/${level}/{z}/{x}/{y}.png`;
 
     currentLayer = L.tileLayer(tileUrl, {
         tileSize: 256,
