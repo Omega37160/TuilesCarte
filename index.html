@@ -69,6 +69,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+        logger("Service Worker actif ✓", "info");
+    }).catch(err => {
+        logger("Erreur SW : " + err.message, "error");
+    });
+}
+    
 const logElement = document.getElementById('debug-log');
 const status = document.getElementById('status');
 const cacheName = 'offline-maps-v1';
@@ -84,24 +93,6 @@ function logger(msg, type = "info") {
     logElement.appendChild(entry);
     logElement.scrollTop = logElement.scrollHeight;
 }
-
-// --- INTERCEPTEUR POUR VOIR CE QUE LEAFLET DEMANDE ---
-window.fetch = ((originalFetch) => {
-    return async (...args) => {
-        const url = args[0];
-        if (url.includes('local-tiles')) {
-            const cache = await caches.open(cacheName);
-            const match = await cache.match(url);
-            const path = url.split('local-tiles/')[1];
-            if (match) {
-                logger(`OUI : ${path}`, "debug");
-            } else {
-                logger(`NON : ${path}`, "error");
-            }
-        }
-        return originalFetch(...args);
-    };
-})(window.fetch);
 
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
