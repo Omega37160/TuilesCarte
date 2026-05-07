@@ -408,83 +408,43 @@ document.getElementById('zipInput')
 //////////////////////////////////////////////////////////
 
 async function updateMap() {
-
-    const level =
-        document.getElementById('levelSelect')
-        .value
-        .toLowerCase();
+    const level = document.getElementById('levelSelect').value.toLowerCase();
 
     if (currentLayer) {
-
         map.removeLayer(currentLayer);
     }
 
-    logger(
-        `--- Tentative d'affichage : ${level} ---`
-    );
+    const tileUrl = window.location.origin + `/local-tiles/${level}/{z}/{x}/{y}.png`;
 
-    const cache = await caches.open(cacheName);
+    logger(`Chargement des tuiles : ${level}`);
 
-    const keys = await cache.keys();
+    currentLayer = L.tileLayer(tileUrl, {
+        tileSize: 256,
+        minZoom: 0,
+        maxZoom: 5,           // ← baisse ça au début pour tester
+        noWrap: true,
+        bounds: L.latLngBounds([[0,0], [8192,8192]]),
+        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' // tuile grise si erreur
+    }).addTo(map);
 
-    const match = keys.find(k =>
-        k.url.includes(`/local-tiles/${level}/`)
-    );
+    // Centre sur une tuile existante
+    try {
+        const cache = await caches.open(cacheName);
+        const keys = await cache.keys();
+        const sample = keys.find(k => k.url.includes(`/local-tiles/${level}/`));
 
-    if (!match) {
+        if (sample) {
+            const parts = sample.url.split('/');
+            const z = parseInt(parts[parts.length-3]);
+            const x = parseInt(parts[parts.length-2]);
+            const y = parseInt(parts[parts.length-1].split('.')[0]);
 
-        logger(
-            `❌ Aucune tuile trouvée pour ${level}`,
-            "error"
-        );
-
-        return;
-    }
-
-    const parts = match.url.split('/');
-
-    const z =
-        parseInt(parts[parts.length - 3]);
-
-    const x =
-        parseInt(parts[parts.length - 2]);
-
-    const y =
-        parseInt(
-            parts[parts.length - 1]
-            .split('.')[0]
-        );
-
-    logger(
-        `🎯 Tuile trouvée : Z=${z} X=${x} Y=${y}`
-    );
-
-    currentLayer = L.tileLayer(
-
-        window.location.origin +
-        `/local-tiles/${level}/{z}/{x}/{y}.png`,
-
-        {
-            tileSize:256,
-            minZoom:0,
-            maxZoom:22,
-            noWrap:true,
-            bounds:[[0,0],[8192,8192]]
+            const point = L.point(x * 256, y * 256);
+            const latlng = map.unproject(point, z);
+            map.setView(latlng, Math.min(z, 4)); // zoom raisonnable
         }
-
-    ).addTo(map);
-
-    const point =
-        L.point(x * 256, y * 256);
-
-    const latlng =
-        map.unproject(point, z);
-
-    map.setView(latlng, z);
-
-    renderMarkers();
+    } catch(e) {}
 }
-
 //////////////////////////////////////////////////////////
 // RENDER MARKERS
 //////////////////////////////////////////////////////////
