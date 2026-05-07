@@ -374,44 +374,50 @@ async function updateMap() {
 
     logger(`--- Chargement niveau : ${level} ---`);
 
-    const tileUrl = `/local-tiles/${level}/{z}/{x}/{y}.png`;
+    // 1. On utilise le chemin relatif correct
+    const tileUrl = `local-tiles/${level}/{z}/{x}/{y}.png`;
 
     currentLayer = L.tileLayer(tileUrl, {
         tileSize: 256,
         minZoom: 0,
         maxZoom: 6,
         noWrap: true,
-        bounds: [[0, 0], [8192, 8192]],
-        // Tuile de secours visible (gris) si erreur
+        tms: true, // IMPORTANT : Inverse l'axe Y pour correspondre au format standard
+        continuousWorld: true,
+        bounds: [[-1000, -1000], [1000, 1000]], // Donne de l'espace pour cliquer
         errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
     }).addTo(map);
 
-    // Cherche une tuile existante pour centrer
+    // Centrage intelligent
     try {
         const cache = await caches.open(cacheName);
         const keys = await cache.keys();
         
+        // On cherche une tuile spécifique au niveau choisi
         const sampleTile = keys.find(k => 
-            k.url.includes(`/local-tiles/${level}/`) && k.url.endsWith('.png')
+            k.url.includes(`/local-tiles/${level}/`)
         );
 
         if (sampleTile) {
-            const parts = sampleTile.url.split('/');
+            const url = new URL(sampleTile.url);
+            const parts = url.pathname.split('/');
+            // Structure : .../level/z/x/y.png
             const z = parseInt(parts[parts.length - 3]);
             const x = parseInt(parts[parts.length - 2]);
-            const y = parseInt(parts[parts.length - 1].split('.')[0]);
+            const y = parseInt(parts[parts.length - 1]);
 
+            // Conversion coordonnée tuile -> LatLng pour L.CRS.Simple
             const point = L.point(x * 256, y * 256);
-            const latlng = map.unproject(point, z || 0);
+            const latlng = map.unproject(point, z);
             
-            map.setView(latlng, Math.max(0, Math.min(z || 2, 5)));
-            logger(`✅ Centré sur tuile Z=${z} X=${x} Y=${y}`);
+            map.setView(latlng, z);
+            logger(`✅ Centré sur : Z=${z} X=${x} Y=${y}`);
         } else {
-            logger(`⚠️ Aucune tuile trouvée pour ${level}`, "warn");
+            logger(`⚠️ Aucune tuile en cache pour ${level}`, "warn");
             map.setView([0, 0], 2);
         }
     } catch(e) {
-        console.error(e);
+        console.error("Erreur de centrage:", e);
     }
 }
 //////////////////////////////////////////////////////////
