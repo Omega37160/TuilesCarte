@@ -3,12 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-    <title>Carte Offline - Relevé Terrain</title>
-
-    <link rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
+    <title>Carte Offline - Relevé Terrain Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         :root{
             --primary:#3b82f6;
@@ -16,7 +12,6 @@
             --card:#1e293b;
             --text:#f8fafc;
         }
-
         body{
             font-family:sans-serif;
             background:var(--bg);
@@ -26,7 +21,6 @@
             flex-direction:column;
             height:100vh;
         }
-
         header{
             padding:10px;
             background:var(--card);
@@ -34,7 +28,6 @@
             font-weight:bold;
             border-bottom:1px solid #334155;
         }
-
         #controls{
             padding:15px;
             display:flex;
@@ -42,13 +35,11 @@
             gap:8px;
             background:var(--card);
         }
-
         #map{
             flex:1;
             width:100%;
             background:#000;
         }
-
         #debug-log{
             height:80px;
             background:#000;
@@ -60,9 +51,7 @@
             border-top:1px solid #334155;
             white-space:pre-wrap;
         }
-
-        select,
-        input{
+        select, input{
             padding:12px;
             border-radius:5px;
             border:1px solid #334155;
@@ -71,20 +60,17 @@
             width:100%;
             box-sizing:border-box;
         }
-
         #status{
             font-size:13px;
             color:#3b82f6;
             font-weight:bold;
         }
-
         .action-buttons{
             display:flex;
             padding:10px;
             gap:10px;
             background:var(--card);
         }
-
         button{
             cursor:pointer;
             font-weight:bold;
@@ -92,55 +78,9 @@
             border-radius:5px;
             padding:12px;
         }
-    </style>
-</head>
-
-<body>
-
-<header>CARTE OFFLINE 2</header>
-
-<div id="controls">
-
-    <div id="status">
-        En attente de fichier ZIP...
-    </div>
-
-    <input type="file"
-           id="zipInput"
-           accept=".zip">
-
-    <select id="levelSelect">
-        <option value="rdc">RDC</option>
-        <option value="n-1" selected>N-1</option>
-        <option value="n+1">N+1</option>
-        <option value="n+2">N+2</option>
-    </select>
-
-</div>
-
-<div id="map"></div>
-
-<div class="action-buttons">
-
-    <button onclick="downloadCsv()"
-            style="background:#3b82f6;color:white;flex:1;">
-        💾 Télécharger CSV
-    </button>
-
-    <button onclick="sendCsvByEmail()"
-            style="background:#10b981;color:white;flex:1;">
-        📧 Email
-    </button>
-
-    <button onclick="clearCsv()"
-            style="background:#ef4444;color:white;flex:1;">
-        🗑️ Vider
-    </button>
-
-</div>
-
-<div id="equipmentModal"
-     style="display:none;
+        /* Modal Style */
+        #equipmentModal {
+            display:none;
             position:fixed;
             top:50%;
             left:50%;
@@ -150,502 +90,275 @@
             z-index:2000;
             border:1px solid #334155;
             width:85%;
+            max-height: 80vh;
+            overflow-y: auto;
             border-radius:10px;
-            box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+            box-shadow:0 10px 25px rgba(0,0,0,0.5);
+        }
+        label { display: block; margin-bottom: 5px; font-size: 0.9em; color: #94a3b8; }
+    </style>
+</head>
+<body>
 
+<header>CARTE OFFLINE 2.0</header>
+
+<div id="controls">
+    <div id="status">En attente de fichier ZIP...</div>
+    <input type="file" id="zipInput" accept=".zip">
+    <select id="levelSelect">
+        <option value="rdc">RDC</option>
+        <option value="n-1" selected>N-1</option>
+        <option value="n+1">N+1</option>
+        <option value="n+2">N+2</option>
+    </select>
+</div>
+
+<div id="map"></div>
+
+<div class="action-buttons">
+    <button onclick="downloadZipExport()" style="background:#3b82f6;color:white;flex:2;">
+        💾 Télécharger Export (ZIP)
+    </button>
+    <button onclick="clearCsv()" style="background:#ef4444;color:white;flex:1;">
+        🗑️ Vider
+    </button>
+</div>
+
+<div id="equipmentModal">
     <h3 style="margin-top:0;">Nouvel Équipement</h3>
-
     <label>Nom du Tag :</label>
-
-    <input type="text"
-           id="tagName"
-           placeholder="ex: PT-101"
-           style="margin-bottom:10px;">
-
+    <input type="text" id="tagName" placeholder="ex: PT-101" style="margin-bottom:10px;">
+    
     <label>Type :</label>
-
-    <select id="tagType"
-            style="margin-bottom:10px;">
-
+    <select id="tagType" style="margin-bottom:10px;">
         <option value="Instrumentation">Instrumentation</option>
         <option value="Moteur">Moteur</option>
         <option value="Armoire">Armoire</option>
         <option value="Autre">Autre</option>
-
     </select>
 
     <label>Photo :</label>
-
-    <input type="file"
-           id="photoInput"
-           accept="image/*"
-           capture="environment"
-           style="margin-bottom:10px;">
+    <input type="file" id="photoInput" accept="image/*" capture="environment" style="margin-bottom:10px;">
 
     <div style="margin-top:15px;display:flex;gap:10px;">
-
-        <button onclick="saveEquipment()"
-                style="background:var(--primary);color:white;flex:1;">
-            Enregistrer
-        </button>
-
-        <button onclick="closeModal()"
-                style="background:#64748b;color:white;flex:1;">
-            Annuler
-        </button>
-
+        <button onclick="saveEquipment()" style="background:var(--primary);color:white;flex:1;">Enregistrer</button>
+        <button onclick="closeModal()" style="background:#64748b;color:white;flex:1;">Annuler</button>
     </div>
-
 </div>
 
-<div id="debug-log">
---- Logs Système ---
-</div>
+<div id="debug-log">--- Logs Système ---</div>
 
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
-
-//////////////////////////////////////////////////////////
-// SERVICE WORKER
-//////////////////////////////////////////////////////////
-
-if ('serviceWorker' in navigator) {
-
-    navigator.serviceWorker.register('./sw.js')
-
-    .then(() => {
-        logger("Service Worker actif ✓", "info");
-    })
-
-    .catch(err => {
-        logger("Erreur SW : " + err.message, "error");
-    });
-}
-
-//////////////////////////////////////////////////////////
-// VARIABLES
-//////////////////////////////////////////////////////////
-
-const logElement = document.getElementById('debug-log');
-
-const status = document.getElementById('status');
-
 const cacheName = 'offline-maps-v1';
-
+const logElement = document.getElementById('debug-log');
+const status = document.getElementById('status');
 let currentLayer = null;
-
 let tempCoords = null;
+let equipmentData = JSON.parse(localStorage.getItem('equipments') || '[]');
 
-let equipmentData =
-    JSON.parse(localStorage.getItem('equipments') || '[]');
-
-//////////////////////////////////////////////////////////
-// LEAFLET FIX IMPORTANT
-//////////////////////////////////////////////////////////
-
+// --- INITIALISATION MAP ---
 let map = L.map('map', {
-
     crs: L.CRS.Simple,
     minZoom: 0,
     maxZoom: 22,
     zoomControl: true
-
-}).setView([0,0],0);
-
-//////////////////////////////////////////////////////////
-// LOGGER
-//////////////////////////////////////////////////////////
+}).setView([0,0], 0);
 
 function logger(msg, type = "info") {
-
     const entry = document.createElement('div');
-
-    const colors = {
-        info:"#10b981",
-        warn:"#f59e0b",
-        error:"#ef4444",
-        debug:"#3b82f6"
-    };
-
+    const colors = { info:"#10b981", warn:"#f59e0b", error:"#ef4444", debug:"#3b82f6" };
     entry.style.color = colors[type];
-
-    entry.textContent =
-        `> [${type.toUpperCase()}] ${msg}`;
-
+    entry.textContent = `> [${type.toUpperCase()}] ${msg}`;
     logElement.appendChild(entry);
-
-    logElement.scrollTop =
-        logElement.scrollHeight;
+    logElement.scrollTop = logElement.scrollHeight;
 }
 
-//////////////////////////////////////////////////////////
-// IMPORT ZIP
-//////////////////////////////////////////////////////////
+// --- GESTION DES PHOTOS (OPTIMISATION) ---
+async function processImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1024; // On limite la taille pour le stockage local
+                let width = img.width;
+                let height = img.height;
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.8)); // Compression JPEG 80%
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
+// --- IMPORT ZIP DES TUILES ---
 document.getElementById('zipInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    status.innerText = "Analyse du ZIP...";
-    logger("Début import : " + file.name);
-
+    status.innerText = "Traitement des tuiles...";
     try {
         const zip = await JSZip.loadAsync(file);
         await caches.delete(cacheName);
         const newCache = await caches.open(cacheName);
-
         let count = 0;
         const levelsFound = new Set();
 
         for (const [path, entry] of Object.entries(zip.files)) {
-            if (entry.dir || path.includes('__MACOSX') || !path.match(/\.(png|jpg|jpeg)$/i)) {
-                continue;
-            }
+            if (entry.dir || !path.match(/\.(png|jpg|jpeg)$/i)) continue;
 
-            // Nouvelle logique pour ta structure
-            let cleanPath = path.replace(/^Tiles\//i, ''); // Enlève "Tiles/"
+            let cleanPath = path.replace(/^Tiles\//i, '');
             const segments = cleanPath.toLowerCase().split('/');
-
-            const levelMap = {
-                'n+1': 'n+1',
-                'n-1': 'n-1',
-                'n+2': 'n+2',
-                'rdc': 'rdc'
-            };
-
-            let levelName = null;
-            for (let seg of segments) {
-                if (levelMap[seg]) {
-                    levelName = levelMap[seg];
-                    break;
-                }
-            }
-
+            const levelMap = { 'n+1':'n+1', 'n-1':'n-1', 'n+2':'n+2', 'rdc':'rdc' };
+            
+            let levelName = segments.find(s => levelMap[s]);
             if (!levelName) continue;
-
             levelsFound.add(levelName);
 
-            // Extraire z/x/y
-            const afterLevel = segments.slice(segments.indexOf(levelName.toLowerCase()) + 1);
-            const coords = afterLevel.filter(s => /^\d+$/.test(s) || s.match(/^\d+\.(png|jpg|jpeg)$/i));
-
+            const afterLevel = segments.slice(segments.indexOf(levelName) + 1);
+            const coords = afterLevel.filter(s => /^\d+$/.test(s) || s.match(/^\d+\./));
             if (coords.length < 3) continue;
 
             const z = coords[coords.length - 3];
             const x = coords[coords.length - 2];
             const y = coords[coords.length - 1].split('.')[0];
 
-            const finalPath = `${levelName}/${z}/${x}/${y}.png`;
-            const virtualUrl = window.location.origin + '/local-tiles/' + finalPath;
-
+            const virtualUrl = `${window.location.origin}/local-tiles/${levelName}/${z}/${x}/${y}.png`;
             const blob = await entry.async('blob');
-            await newCache.put(
-                virtualUrl,
-                new Response(blob, { headers: { 'Content-Type': 'image/png' } })
-            );
+            await newCache.put(virtualUrl, new Response(blob, { headers: {'Content-Type': 'image/png'} }));
             count++;
         }
-
-        logger(`Niveaux détectés : ${Array.from(levelsFound).join(', ')}`);
-        logger(`Total mappé : ${count} tuiles`);
+        logger(`Importé: ${count} tuiles. Niveaux: ${Array.from(levelsFound).join(', ')}`);
         status.innerText = `Prêt (${count} tuiles)`;
-
-        // Auto-affichage du premier niveau
-        document.getElementById('levelSelect').value = Array.from(levelsFound)[0] || 'n-1';
         updateMap();
-
-    } catch(err) {
-        logger("CRASH ZIP : " + err.message, "error");
-        console.error(err);
-    }
+    } catch(err) { logger("Erreur ZIP: " + err.message, "error"); }
 });
 
-//////////////////////////////////////////////////////////
-// UPDATE MAP
-//////////////////////////////////////////////////////////
-
+// --- UPDATE MAP ---
 async function updateMap() {
     const level = document.getElementById('levelSelect').value.toLowerCase();
-
     if (currentLayer) map.removeLayer(currentLayer);
-
-    logger(`--- Chargement niveau : ${level} ---`);
-
-    // 1. On utilise le chemin relatif correct
-    const tileUrl = window.location.origin + `/local-tiles/${level}/{z}/{x}/{y}.png`;
+    const tileUrl = `${window.location.origin}/local-tiles/${level}/{z}/{x}/{y}.png`;
 
     currentLayer = L.tileLayer(tileUrl, {
-        tileSize: 256,
-        minZoom: 0,
-        maxZoom: 6,
-        noWrap: true,
-        tms: true, // IMPORTANT : Inverse l'axe Y pour correspondre au format standard
-        continuousWorld: true,
-        bounds: [[-1000, -1000], [1000, 1000]], // Donne de l'espace pour cliquer
-        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+        tileSize: 256, minZoom: 0, maxZoom: 10, noWrap: true, tms: true
     }).addTo(map);
-
-    // Centrage intelligent
-    try {
-        const cache = await caches.open(cacheName);
-        const keys = await cache.keys();
-        
-        // On cherche une tuile spécifique au niveau choisi
-        const sampleTile = keys.find(k => 
-            k.url.includes(`/local-tiles/${level}/`)
-        );
-
-        if (sampleTile) {
-            const url = new URL(sampleTile.url);
-            const parts = url.pathname.split('/');
-            // Structure : .../level/z/x/y.png
-            const z = parseInt(parts[parts.length - 3]);
-            const x = parseInt(parts[parts.length - 2]);
-            const y = parseInt(parts[parts.length - 1]);
-
-            // Conversion coordonnée tuile -> LatLng pour L.CRS.Simple
-            const point = L.point(x * 256, y * 256);
-            const latlng = map.unproject(point, z);
-            
-            map.setView(latlng, z);
-            logger(`✅ Centré sur : Z=${z} X=${x} Y=${y}`);
-        } else {
-            logger(`⚠️ Aucune tuile en cache pour ${level}`, "warn");
-            map.setView([0, 0], 2);
-        }
-    } catch(e) {
-        console.error("Erreur de centrage:", e);
-    }
-}
-//////////////////////////////////////////////////////////
-// RENDER MARKERS
-//////////////////////////////////////////////////////////
-
-function renderMarkers() {
-
-    equipmentData.forEach(item => {
-
-        L.circleMarker(
-            [item.lat, item.lng],
-            {
-                color:'yellow',
-                radius:6
-            }
-        )
-
-        .addTo(map)
-
-        .bindPopup(
-            `<b>${item.tag}</b><br>
-             Niveau: ${item.level}`
-        );
-    });
+    renderMarkers();
 }
 
-//////////////////////////////////////////////////////////
-// CHANGE LEVEL
-//////////////////////////////////////////////////////////
-
-document.getElementById('levelSelect')
-.addEventListener('change', updateMap);
-
-//////////////////////////////////////////////////////////
-// CLICK MAP
-//////////////////////////////////////////////////////////
-
-map.on('click', (e) => {
-
-    tempCoords = e.latlng;
-
-    document.getElementById(
-        'equipmentModal'
-    ).style.display = 'block';
-});
-
-//////////////////////////////////////////////////////////
-// CLOSE MODAL
-//////////////////////////////////////////////////////////
-
-function closeModal() {
-
-    document.getElementById(
-        'equipmentModal'
-    ).style.display = 'none';
-
-    document.getElementById(
-        'tagName'
-    ).value = '';
-
-    document.getElementById(
-        'photoInput'
-    ).value = '';
-}
-
-//////////////////////////////////////////////////////////
-// SAVE EQUIPMENT
-//////////////////////////////////////////////////////////
-
+// --- SAVE EQUIPMENT ---
 async function saveEquipment() {
+    const tag = document.getElementById('tagName').value.trim();
+    const type = document.getElementById('tagType').value;
+    const level = document.getElementById('levelSelect').value.toUpperCase();
+    const photoFile = document.getElementById('photoInput').files[0];
 
-    const tag =
-        document.getElementById('tagName').value;
+    if (!tag) return alert("Tag obligatoire");
 
-    const type =
-        document.getElementById('tagType').value;
-
-    const level =
-        document.getElementById('levelSelect')
-        .value
-        .toUpperCase();
-
-    if (!tag) {
-
-        alert("Le nom du Tag est obligatoire");
-
-        return;
+    let photoData = null;
+    if (photoFile) {
+        status.innerText = "Traitement photo...";
+        photoData = await processImage(photoFile);
     }
 
     const newItem = {
-
-        tag,
-        type,
-        level,
-
+        tag, type, level,
         lat: tempCoords.lat.toFixed(6),
-
         lng: tempCoords.lng.toFixed(6),
-
-        date: new Date().toLocaleString()
+        date: new Date().toLocaleString(),
+        photo: photoData 
     };
 
     equipmentData.push(newItem);
-
-    localStorage.setItem(
-        'equipments',
-        JSON.stringify(equipmentData)
-    );
-
-    L.circleMarker(tempCoords,{
-
-        color:'yellow',
-        radius:8
-
-    })
-
-    .addTo(map)
-
-    .bindPopup(
-        `<b>${tag}</b> [${level}]<br>${type}`
-    )
-
-    .openPopup();
-
+    localStorage.setItem('equipments', JSON.stringify(equipmentData));
+    
+    addMarkerToMap(newItem);
     logger(`Enregistré : ${tag}`);
-
+    status.innerText = "Équipement ajouté";
     closeModal();
 }
 
-//////////////////////////////////////////////////////////
-// CSV
-//////////////////////////////////////////////////////////
-
-function generateCsvBlob() {
-
-    let csvContent =
-        "\ufeffTag;Nom;Type;Niveau;Latitude;Longitude\n";
-
-    equipmentData.forEach(item => {
-
-        csvContent +=
-            `${item.tag};${item.tag};${item.type};${item.level};${item.lat};${item.lng}\n`;
-    });
-
-    return new Blob(
-        [csvContent],
-        {type:'text/csv;charset=utf-8;'}
-    );
+function addMarkerToMap(item) {
+    const popupContent = `
+        <div style="color:black">
+            <b>${item.tag}</b> (${item.type})<br>
+            ${item.photo ? `<img src="${item.photo}" style="width:100%;margin-top:5px;border-radius:5px;">` : '<i>Pas de photo</i>'}
+        </div>`;
+    L.circleMarker([item.lat, item.lng], { color:'yellow', radius:8 })
+     .addTo(map)
+     .bindPopup(popupContent);
 }
 
-function downloadCsv() {
+function renderMarkers() {
+    map.eachLayer(layer => { if(layer instanceof L.CircleMarker) map.removeLayer(layer); });
+    equipmentData.forEach(addMarkerToMap);
+}
 
-    if (equipmentData.length === 0) {
+// --- EXPORT ZIP (CSV + PHOTOS) ---
+async function downloadZipExport() {
+    if (equipmentData.length === 0) return alert("Aucune donnée");
+    
+    status.innerText = "Génération du ZIP...";
+    const zip = new JSZip();
+    let csv = "\ufeffTag;Type;Niveau;Latitude;Longitude;Date;Photo_Fichier\n";
 
-        alert("Aucune donnée !");
-
-        return;
+    for (const item of equipmentData) {
+        let photoName = "";
+        if (item.photo) {
+            photoName = `${item.tag.replace(/[^a-z0-9]/gi, '_')}.jpg`;
+            const base64Data = item.photo.split(',')[1];
+            zip.file(`photos/${photoName}`, base64Data, {base64: true});
+        }
+        csv += `${item.tag};${item.type};${item.level};${item.lat};${item.lng};${item.date};${photoName}\n`;
     }
 
-    const blob = generateCsvBlob();
-
-    const url =
-        URL.createObjectURL(blob);
-
-    const link =
-        document.createElement('a');
-
-    link.href = url;
-
-    link.download =
-        `releve_terrain_${Date.now()}.csv`;
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
-
-    logger("CSV téléchargé");
+    zip.file("relevé_terrain.csv", csv);
+    const blob = await zip.generateAsync({type:"blob"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `export_terrain_${Date.now()}.zip`;
+    a.click();
+    status.innerText = "Export ZIP terminé";
 }
 
-function sendCsvByEmail() {
+// --- UTILS ---
+map.on('click', (e) => {
+    tempCoords = e.latlng;
+    document.getElementById('equipmentModal').style.display = 'block';
+});
 
-    if (equipmentData.length === 0) {
-
-        alert("Le CSV est vide !");
-
-        return;
-    }
-
-    downloadCsv();
-
-    setTimeout(() => {
-
-        window.location.href =
-            `mailto:?subject=Relevé Terrain&body=Veuillez trouver ci-joint le relevé de ${equipmentData.length} équipements.`;
-
-    },500);
+function closeModal() {
+    document.getElementById('equipmentModal').style.display = 'none';
+    document.getElementById('tagName').value = '';
+    document.getElementById('photoInput').value = '';
 }
-
-//////////////////////////////////////////////////////////
-// CLEAR
-//////////////////////////////////////////////////////////
 
 function clearCsv() {
-
-    if (
-        confirm(
-            "Voulez-vous vraiment vider tous les équipements ?"
-        )
-    ) {
-
-        equipmentData = [];
-
+    if (confirm("Vider toutes les données ?")) {
         localStorage.removeItem('equipments');
-
         location.reload();
     }
 }
 
-//////////////////////////////////////////////////////////
-// START
-//////////////////////////////////////////////////////////
-
+document.getElementById('levelSelect').addEventListener('change', updateMap);
 window.onload = renderMarkers;
 
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(() => logger("SW Ready"));
+}
 </script>
-
 </body>
 </html>
