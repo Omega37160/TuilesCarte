@@ -100,7 +100,7 @@
 </head>
 <body>
 
-<header>CARTE OFFLINE 3.0</header>
+<header>CARTE OFFLINE 3.1</header>
 
 <div id="controls">
     <div id="status">En attente de fichier ZIP...</div>
@@ -327,7 +327,7 @@ async function downloadZipExport() {
         // Mapping des données existantes et intégration des colonnes vides
         // item.type correspond à la colonne "Categorie" selon votre demande précédente
         const tag = item.tag;
-        const nom = "";          // Vide
+        const nom = item.tag;          // Vide
         const categorie = item.type; 
         const typeCol = "";      // Vide
         const hauteur = "";      // Vide
