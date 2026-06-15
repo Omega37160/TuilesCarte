@@ -312,7 +312,9 @@ async function downloadZipExport() {
     
     status.innerText = "Génération du ZIP...";
     const zip = new JSZip();
-    let csv = "\ufeffTag;Type;Niveau;Latitude;Longitude;Date;Photo_Fichier\n";
+    
+    // Définition de la nouvelle structure d'en-tête (17 colonnes)
+    let csv = "\ufeffTag;Nom;Categorie;Type;Hauteur;Mini;Maxi;Station;Depart;Courroies;Emplacement;Niveau;Latitude;Longitude;Photo;Commentaire;SAP\n";
 
     for (const item of equipmentData) {
         let photoName = "";
@@ -321,7 +323,29 @@ async function downloadZipExport() {
             const base64Data = item.photo.split(',')[1];
             zip.file(`photos/${photoName}`, base64Data, {base64: true});
         }
-        csv += `${item.tag};${item.type};${item.level};${item.lat};${item.lng};${item.date};${photoName}\n`;
+
+        // Mapping des données existantes et intégration des colonnes vides
+        // item.type correspond à la colonne "Categorie" selon votre demande précédente
+        const tag = item.tag;
+        const nom = "";          // Vide
+        const categorie = item.type; 
+        const typeCol = "";      // Vide
+        const hauteur = "";      // Vide
+        const mini = "";         // Vide
+        const maxi = "";         // Vide
+        const station = "";      // Vide
+        const depart = "";       // Vide
+        const courroies = "";    // Vide
+        const emplacement = "";  // Vide
+        const niveau = item.level;
+        const latitude = item.lat;
+        const longitude = item.lng;
+        const photo = photoName;
+        const commentaire = "";  // Vide
+        const sap = "";          // Vide
+
+        // Construction de la ligne CSV en respectant scrupuleusement l'ordre demandé
+        csv += `${tag};${nom};${categorie};${typeCol};${hauteur};${mini};${maxi};${station};${depart};${courroies};${emplacement};${niveau};${latitude};${longitude};${photo};${commentaire};${sap}\n`;
     }
 
     zip.file("relevé_terrain.csv", csv);
